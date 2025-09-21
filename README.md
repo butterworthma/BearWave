@@ -1,7 +1,7 @@
-# Evaluating NVIS for Remote Wildlife Monitoring: A Field Trial in the Borneo Rainforest
+# Enhancing Remote Conservation in Borneo: NVIS for Wildlife Monitoring and Protection using BearWave
 
 ## 📊 Overview
-This repository contains the field trial analysis code for **"Evaluating NVIS for Remote Wildlife Monitoring: A Field Trial in the Borneo Rainforest"** - Paper 1 of the research series. The code includes field trial results from UK test sites, NVIS propagation modeling, and signal performance analysis that informed the Borneo deployment.
+This repository contains the field trial analysis code for **"Enhancing Remote Conservation in Borneo: NVIS for Wildlife Monitoring and Protection using BearWave"** - the comprehensive research on Near Vertical Incidence Skywave (NVIS) communication technology for wildlife conservation applications. The code includes field trial results from UK test sites, NVIS propagation modeling, and signal performance analysis that informed the Borneo deployment.
 
 ## 🌍 Field Trial Locations
 - **Belpha Farm, Wales** (51.96°N, -2.94°W)
@@ -66,7 +66,7 @@ This research supports remote wildlife monitoring applications, specifically:
 For issues or questions, refer to the documentation in the `docs/` directory.
 
 ## 📄 Citation
-**"Evaluating NVIS for Remote Wildlife Monitoring: A Field Trial in the Borneo Rainforest"**  
+**"Enhancing Remote Conservation in Borneo: NVIS for Wildlife Monitoring and Protection using BearWave"**
 *PhD Research - Cardiff University*
 
 ## 🔗 Related Work
