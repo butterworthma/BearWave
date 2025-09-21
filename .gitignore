@@ -9,6 +9,13 @@
 *.xls
 *.csv
 
+# Exception: Include essential field trial data files
+!data/field_trial_data.xlsx
+!data/belpha_data.xlsx
+!data/clydach_data.xlsx
+!data/brockweir_data.xlsx
+!data/NVIS_data.xlsx
+
 # Output directories
 output/
 results/
