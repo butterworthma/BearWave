@@ -1,0 +1,103 @@
+██████╗ ███████╗ █████╗ ██████╗ ██╗    ██╗ █████╗ ██╗   ██╗███████╗
+██╔══██╗██╔════╝██╔══██╗██╔══██╗██║    ██║██╔══██╗██║   ██║██╔════╝
+██████╔╝█████╗  ███████║██████╔╝██║ █╗ ██║███████║██║   ██║█████╗  
+██╔══██╗██╔══╝  ██╔══██║██╔══██╗██║███╗██║██╔══██║╚██╗ ██╔╝██╔══╝  
+██████╔╝███████╗██║  ██║██║  ██║╚███╔███╔╝██║  ██║ ╚████╔╝ ███████╗
+╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝  ╚═══╝  ╚══════╝
+
+  🌿 EVALUATING NVIS FOR REMOTE WILDLIFE MONITORING 🌿
+    🌳 A FIELD TRIAL IN THE BORNEO RAINFOREST 🌳
+
+                    ╭─────────────────────────────────╮
+                    │    📡 FIELD TRIAL LOCATIONS     │
+                    ╰─────────────────────────────────╯
+                              ┌─────────────┐
+                              │ BELPHA FARM │
+                              │ 🇬🇧 Wales   │
+                              │ 51.96°N     │
+                              └─────────────┘
+                                     │
+                    ╭────────────────┼────────────────╮
+                    │                │                │
+              ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+              │ CLYDACH     │  │ BROCKWEIR   │  │    DGFC     │
+              │ WOODS 🌲    │  │ WOOD 🌳     │  │ 🇲🇾 Borneo  │
+              │ Wales       │  │ Wales       │  │  5.41°N     │
+              └─────────────┘  └─────────────┘  └─────────────┘
+
+    ╭─────────────────────────────────────────────────────────────╮
+    │                    📊 FIELD TRIAL RESULTS                   │
+    ├─────────────────────────────────────────────────────────────┤
+    │  📈 Fig. 9: 1-Week Trial Performance (3 UK Sites)          │
+    │  📊 Fig. 10: Diurnal Fluctuations & Reliability Analysis   │
+    │  📡 Fig. 3: NVIS Propagation Model & foF2 Mapping          │
+    │  📻 Fig. 5: Antenna Design & SWR Performance               │
+    │  🌍 Real-world NVIS Communication Testing                  │
+    │  📋 Professional Scientific Report Formatting              │
+    ╰─────────────────────────────────────────────────────────────╯
+
+    ╭─────────────────────────────────────────────────────────────╮
+    │                   🚀 QUICK START COMMANDS                   │
+    ├─────────────────────────────────────────────────────────────┤
+    │  pip install -r requirements.txt                           │
+    │  python field_trials/belpha_analysis.py                    │
+    │  python field_trials/clydach_analysis.py                   │
+    │  python field_trials/brockweir_analysis.py                 │
+    │  python nvis_models/propagation_model.py                   │
+    ╰─────────────────────────────────────────────────────────────╯
+
+                    ╭─────────────────────────────────╮
+                    │        📁 REPOSITORY MAP        │
+                    ├─────────────────────────────────┤
+                    │  📂 field_trials/ - UK Tests   │
+                    │  📂 nvis_models/  - Propagation │
+                    │  📂 data/         - Trial Data  │
+                    │  📂 output/       - Generated   │
+                    │  📂 docs/         - Documentation│
+                    ╰─────────────────────────────────╯
+
+    ╭─────────────────────────────────────────────────────────────╮
+    │                      🌊 NVIS ANALYSIS                       │
+    ├─────────────────────────────────────────────────────────────┤
+    │                                                             │
+    │    📡 HF Waves  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~         │
+    │                /                                   \        │
+    │               /         IONOSPHERE F2 LAYER        \       │
+    │              /_____________________________________ \      │
+    │             /                                       \      │
+    │            /              NVIS PROPAGATION           \     │
+    │           /                                          \     │
+    │    🌍 UK /_____________Field Trial Sites_____________\    │
+    │                                                             │
+    │    📻 Belpha → 📡 Ionospheric Reflection → 📻 Receiver    │
+    │                                                             │
+    ╰─────────────────────────────────────────────────────────────╯
+
+                    ╭─────────────────────────────────╮
+                    │      🎯 RESEARCH OUTCOMES       │
+                    ├─────────────────────────────────┤
+                    │  📊 Field Trial Visualizations  │
+                    │  📈 Diurnal Pattern Analysis    │
+                    │  🌍 Multi-Site Comparisons      │
+                    │  📡 NVIS Propagation Modeling   │
+                    │  📋 Publication-Ready Charts    │
+                    ╰─────────────────────────────────╯
+
+    ╭─────────────────────────────────────────────────────────────╮
+    │           🏆 EVALUATING NVIS FOR REMOTE WILDLIFE           │
+    │              MONITORING: A FIELD TRIAL IN THE              │
+    │                   BORNEO RAINFOREST                        │
+    │                                                             │
+    │    "Advancing Conservation Through Field-Tested NVIS       │
+    │     Communication Technology for Wildlife Monitoring"      │
+    │                                                             │
+    │              🎓 PhD Research - Cardiff University           │
+    │              🌿 Field Trials: Wales → Borneo Application   │
+    ╰─────────────────────────────────────────────────────────────╯
+
+                              ╭─────────────╮
+                              │  Made with  │
+                              │  🐍 Python  │
+                              │  📊 Science │
+                              │  🌿 Conservation │
+                              ╰─────────────╯

@@ -1,0 +1,21 @@
+# Field Trial Analysis Tools - Python Dependencies
+# ===================================================
+
+# Core data analysis libraries
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Plotting and visualization
+matplotlib>=3.5.0
+
+# Excel file support
+openpyxl>=3.0.0
+
+# Date/time handling
+python-dateutil>=2.8.0
+
+# Optional: Enhanced plotting
+seaborn>=0.11.0
+
+# Optional: Statistical analysis
+scipy>=1.9.0

@@ -1,0 +1,46 @@
+# Generated charts and outputs
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Data files (too large/sensitive for git)
+*.xlsx
+*.xls
+*.csv
+
+# Output directories
+output/
+results/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# User-specific paths
+**/Desktop/**
+**/Users/**
+
+# Temporary files
+*.tmp
+*.temp
+*.log
