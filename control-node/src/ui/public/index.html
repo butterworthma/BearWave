@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>BearWave Control Node</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="screen-shell">
+    <header class="topbar">
+      <button class="icon-button menu-button" type="button" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <img class="brand-logo" src="/assets/bearwave-logo-header.png" alt="BearWave">
+
+      <div class="title-block">
+        <h1>BearWave Control Node</h1>
+        <p>Remote Trap Monitor</p>
+      </div>
+
+      <div class="clock-block">
+        <span>UTC</span>
+        <strong id="utcClock">--:--:--</strong>
+      </div>
+
+      <button class="icon-button settings-button" type="button" aria-label="Settings">
+        <span></span>
+      </button>
+    </header>
+
+    <section id="alarmBanner" class="alarm-banner hidden" role="status" aria-live="polite">
+      <div>
+        <strong>Alarm Active</strong>
+        <span id="alarmText">Alarm received</span>
+      </div>
+      <button id="silenceBtn" type="button">Silence</button>
+    </section>
+
+    <section class="summary-strip" aria-label="System summary">
+      <div class="summary-item">
+        <div class="summary-icon nodes-icon"></div>
+        <strong id="nodeCount">0</strong>
+        <span>Nodes</span>
+      </div>
+      <div class="summary-item alarm-count">
+        <div class="summary-icon alert-icon">!</div>
+        <strong id="alarmCount">0</strong>
+        <span>Alarm</span>
+      </div>
+      <div class="summary-item heartbeat-count">
+        <div class="summary-icon clock-icon"></div>
+        <strong id="missingCount">0</strong>
+        <span>Missing Heartbeat</span>
+      </div>
+      <div class="summary-item healthy-count">
+        <div class="summary-icon shield-icon"></div>
+        <strong id="healthyCount">0</strong>
+        <span>Healthy</span>
+      </div>
+    </section>
+
+    <main class="dashboard-main">
+      <section class="node-panel" aria-label="Trap nodes">
+        <div id="nodeGrid" class="node-grid"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Control node sections">
+      <button class="active" data-view="dashboard" type="button"><span class="nav-icon gauge-icon"></span>Dashboard</button>
+      <button data-view="nodes" type="button"><span class="nav-icon list-icon"></span>Nodes</button>
+      <button data-view="alerts" type="button"><span class="nav-icon bell-icon"></span>Alerts</button>
+      <button data-view="history" type="button"><span class="nav-icon bars-icon"></span>History</button>
+      <button data-view="map" type="button"><span class="nav-icon map-icon"></span>Map</button>
+      <button data-view="logs" type="button"><span class="nav-icon logs-icon"></span>Logs</button>
+    </nav>
+
+    <footer class="status-footer">
+      <span>System: <strong id="systemStatus">--</strong></span>
+      <span>Uptime: <strong id="uptimeValue">--</strong></span>
+      <span>CPU: <strong id="cpuValue">--</strong></span>
+      <span>Temp: <strong id="tempValue">--</strong></span>
+      <span>Storage: <strong id="storageValue">--</strong></span>
+      <span id="modePill">Mode</span>
+    </footer>
+  </div>
+
+  <dialog id="imageDialog" class="image-dialog">
+    <button id="closeImageBtn" class="close-image" type="button" aria-label="Close image">x</button>
+    <img id="imageDialogImg" alt="Received SSTV image">
+    <div id="imageDialogCaption"></div>
+  </dialog>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

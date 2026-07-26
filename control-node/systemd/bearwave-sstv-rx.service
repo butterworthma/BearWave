@@ -1,0 +1,21 @@
+[Unit]
+Description=BearWave headless SSTV receiver
+# This optional service records/decode audio chunks without using the QSSTV GUI.
+# QSSTV remains the preferred live receiver for the current control-node screen.
+After=pipewire.service pipewire-pulse.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mark/control-node
+Environment=BEARWAVE_CONTROL_DIR=/home/mark/control-node
+# Update this source if `pactl list short sources` reports a different audio
+# device name on the target Pi.
+Environment=BEARWAVE_SSTV_RX_SOURCE=alsa_input.usb-C-Media_Electronics_Inc._USB_Audio_Device-00.mono-fallback
+Environment=BEARWAVE_SSTV_CHUNK_SECONDS=90
+Environment=BEARWAVE_SSTV_KEEP_AUDIO=1
+ExecStart=/home/mark/control-node/scripts/sstv_rx_loop.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

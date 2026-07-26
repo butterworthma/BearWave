@@ -1,0 +1,34 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python cache (if any Python scripts)
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Large binary files (keep images but ignore very large ones)
+*.zip
+*.tar.gz
+
+# Credentials
+*.key
+*.pem
+.env
+.env.local
+*.credentials
+
+# Git credentials
+.git/config
+.git-credentials

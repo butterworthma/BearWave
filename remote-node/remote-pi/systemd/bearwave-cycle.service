@@ -1,0 +1,18 @@
+[Unit]
+Description=BearWave remote-node boot transmit shutdown cycle
+After=multi-user.target graphical.target
+Wants=graphical.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/home/mark/bearwave
+ExecStart=/home/mark/bearwave/scripts/bearwave_boot_cycle.sh
+RemainAfterExit=no
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=0
+
+[Install]
+WantedBy=graphical.target

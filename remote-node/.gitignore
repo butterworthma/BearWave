@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+logs/
+state/
+sstv/
+*.log
+*.wav
+*.jpg
+*.jpeg
+*.png
+*.bak*
+.env

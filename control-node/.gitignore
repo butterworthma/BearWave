@@ -1,0 +1,13 @@
+node_modules/
+.env
+logs/
+*.log
+sstv-audio/
+sstv-images/
+.venv/
+.venv-sstv/
+__pycache__/
+*.pyc
+*.wav
+*.bak-*
+backups/
