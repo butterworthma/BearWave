@@ -109,22 +109,22 @@ Install system packages:
 
 ```bash
 sudo apt update
-sudo apt install -y git python3 python3-venv python3-pip js8call rpicam-apps ffmpeg alsa-utils hamlib-utils lxterminal
+sudo apt install -y git python3 python3-venv python3-pip js8call rpicam-apps ffmpeg alsa-utils libhamlib-utils lxterminal
 ```
 
 Clone the repository:
 
 ```bash
 cd /home/mark
-git clone https://github.com/butterworthma/BearWave_Remote_Node.git BearWave_Remote_Node
+git clone https://github.com/butterworthma/BearWave.git BearWave
 mkdir -p /home/mark/bearwave
 ```
 
 Install the active remote Pi files:
 
 ```bash
-cp -r /home/mark/BearWave_Remote_Node/remote-pi/app /home/mark/bearwave/
-cp -r /home/mark/BearWave_Remote_Node/remote-pi/scripts /home/mark/bearwave/
+cp -r /home/mark/BearWave/remote-node/remote-pi/app /home/mark/bearwave/
+cp -r /home/mark/BearWave/remote-node/remote-pi/scripts /home/mark/bearwave/
 mkdir -p /home/mark/bearwave/logs /home/mark/bearwave/state /home/mark/bearwave/sstv
 chmod +x /home/mark/bearwave/scripts/*.sh
 chmod +x /home/mark/bearwave/scripts/*.py
@@ -137,13 +137,13 @@ cd /home/mark/bearwave
 python3 -m venv .venv
 . .venv/bin/activate
 pip install --upgrade pip
-pip install -r /home/mark/BearWave_Remote_Node/remote-pi/requirements.txt
+pip install -r /home/mark/BearWave/remote-node/remote-pi/requirements.txt
 ```
 
 Install the systemd service:
 
 ```bash
-sudo cp /home/mark/BearWave_Remote_Node/remote-pi/systemd/bearwave-cycle.service /etc/systemd/system/bearwave-cycle.service
+sudo cp /home/mark/BearWave/remote-node/remote-pi/systemd/bearwave-cycle.service /etc/systemd/system/bearwave-cycle.service
 sudo systemctl daemon-reload
 sudo systemctl enable bearwave-cycle.service
 ```
@@ -241,7 +241,7 @@ test -x /home/mark/bearwave/scripts/sstv_transmit_qdx.sh
 /home/mark/bearwave/.venv/bin/python - <<'PY'
 import serial
 import PIL
-import sstv
+import pysstv
 print("remote Python dependencies OK")
 PY
 command -v rpicam-still

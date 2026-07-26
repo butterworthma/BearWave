@@ -52,7 +52,7 @@ rpicam-still OK
 aplay OK
 ffmpeg OK
 js8call OK
-rigctl expected through hamlib-utils
+rigctl expected through libhamlib-utils on Debian Trixie
 convert missing
 serial OK 3.5
 PIL OK 12.2.0
