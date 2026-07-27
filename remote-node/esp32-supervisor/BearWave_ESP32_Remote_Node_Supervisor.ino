@@ -2,30 +2,27 @@
   BearWave Heltec RTC / GPS / OLED / Pi-UART bridge
   -------------------------------------------------
 
-  REMOTE-NODE SUPERVISOR VERSION WITH ACTIVE-LOW POWER ENABLE
-  AND DEEP-SLEEP GPIO HOLD
-  -------------------------------------------------------------
+  REMOTE-NODE SUPERVISOR VERSION FOR BEARWAVE PCB V2
+  --------------------------------------------------
 
   Purpose:
     This ESP32/Heltec sketch supervises the BearWave remote node hardware.
     It powers the Raspberry Pi and radio, provides GPS/RTC/time/event state
     to the Pi over UART, accepts shutdown signalling from the Pi, cuts the
-    Pi/radio power rail, and then enters deep sleep until the next wake cycle.
+    switched power rails, and then enters deep sleep until the next wake cycle.
 
   Key hardware behaviour:
-    GPIO 33 controls the combined switched power rail for:
-      - Raspberry Pi
-      - radio
+    BearWave PCB V2 uses flip-flop latch circuits for the high-power rails:
+      - 5 V rail for the Raspberry Pi Zero 2 W
+      - 12 V rail for the QDX/radio/ATU path
 
-    The enable line is ACTIVE-LOW:
-      GPIO 33 LOW  = Pi/radio rail ON
-      GPIO 33 HIGH = Pi/radio rail OFF
+    The ESP32 does not hold a rail-enable level during deep sleep. Instead, it
+    briefly pulls the relevant ENABLE*PULSE line LOW to emulate a push-button
+    pulse, then releases the pin back to high impedance. The latch preserves
+    the rail state while the ESP32 sleeps.
 
-  Important fix in this version:
-    Before deep sleep, GPIO 33 is driven HIGH and GPIO hold is enabled.
-    This holds the active-low enable line in the OFF state while the ESP32 is
-    asleep. Without this, the pin may stop being actively driven in deep sleep,
-    allowing the Pi/radio rail to turn back on.
+    Rail status is read back using 5VOK and 12VOK so the firmware only pulses a
+    latch when the measured rail state does not match the requested state.
 
   Diagnostic method:
     USB serial must not be connected during the full power test because USB 5 V
@@ -36,7 +33,7 @@
     - boot count
     - reset reason
     - wake reason
-    - rail state
+    - 5 V and 12 V rail state
     - last shutdown stage
 
   Expected healthy wake after sleep:
@@ -83,8 +80,8 @@
 
     SHUTDOWN
       -> OK,SHUTDOWN_RECEIVED
-      The ESP32 then waits PI_POWER_CUT_DELAY_MS, cuts the rail, isolates the
-      Pi UART pins, holds GPIO 33 HIGH, and enters deep sleep.
+      The ESP32 then waits PI_POWER_CUT_DELAY_MS, turns off the 12 V rail,
+      turns off the 5 V rail, isolates the Pi UART pins, and enters deep sleep.
 
   Test/deployment note:
     WAKE_INTERVAL_US is currently set to 60 seconds for test. Change it back
@@ -136,21 +133,34 @@
 // Raspberry Pi UART configuration
 // ============================================================
 
-#define PI_UART_RX_PIN 42
-#define PI_UART_TX_PIN 41
+#define PI_UART_RX_PIN 34
+#define PI_UART_TX_PIN 33
 #define PI_UART_BAUD   115200
 
 // ============================================================
-// Combined Raspberry Pi + radio power control
+// BearWave PCB V2 latch-based power control
 // ============================================================
 
-#define PI_RADIO_POWER_EN_PIN 33
+#define PSU_5V_PULSE_PIN   17
+#define PSU_12V_PULSE_PIN  45
+#define PSU_5V_OK_PIN      7
+#define PSU_12V_OK_PIN     6
 
 /*
-  ACTIVE-LOW rail enable:
-    GPIO33 LOW  = Pi/radio rail ON
-    GPIO33 HIGH = Pi/radio rail OFF
+  V2 power latch convention:
+    ENABLE5VPULSE / ENABLE12VPULSE are active-low momentary pulse inputs.
+    5VOK / 12VOK are rail-present status inputs and are treated as active-high.
+
+  GPIO assignments from the Paper 3 BearWave PCB V2 schematic:
+    PIUARTTX      -> GPIO34  (ESP32 RX from Raspberry Pi TX)
+    PIUARTRX      -> GPIO33  (ESP32 TX to Raspberry Pi RX)
+    5VOK          -> GPIO7
+    12VOK         -> GPIO6
+    ENABLE5VPULSE -> GPIO17
+    ENABLE12VPULSE-> GPIO45
 */
+const unsigned long PSU_LATCH_PULSE_MS = 250UL;
+const unsigned long PSU_LATCH_SETTLE_MS = 1000UL;
 const unsigned long PI_POWER_CUT_DELAY_MS = 50000UL;
 
 /*
@@ -298,14 +308,9 @@ String wakeReasonText() {
 }
 
 String railStateText() {
-  int state = digitalRead(PI_RADIO_POWER_EN_PIN);
-
-  /*
-    Active-low rail:
-      LOW  = ON
-      HIGH = OFF
-  */
-  return state == LOW ? "ON" : "OFF";
+  String five = digitalRead(PSU_5V_OK_PIN) == HIGH ? "5ON" : "5OFF";
+  String twelve = digitalRead(PSU_12V_OK_PIN) == HIGH ? "12ON" : "12OFF";
+  return five + "/" + twelve;
 }
 
 // ============================================================
@@ -376,19 +381,97 @@ void displayReset(void) {
 }
 
 // ============================================================
-// Combined Pi + radio power helpers
+// BearWave PCB V2 latch-based power helpers
 // ============================================================
 
+bool rail5VOn() {
+  return digitalRead(PSU_5V_OK_PIN) == HIGH;
+}
+
+bool rail12VOn() {
+  return digitalRead(PSU_12V_OK_PIN) == HIGH;
+}
+
+void configurePowerLatchPinsIdle() {
+  /*
+    The latch pulse inputs are pulled high on the PCB and the manual switches
+    pull them low. Keep ESP32 pins high-impedance during idle so the firmware
+    does not fight a manual button press.
+  */
+  pinMode(PSU_5V_PULSE_PIN, INPUT);
+  pinMode(PSU_12V_PULSE_PIN, INPUT);
+
+  pinMode(PSU_5V_OK_PIN, INPUT);
+  pinMode(PSU_12V_OK_PIN, INPUT);
+}
+
+void pulseLatchLow(uint8_t pin, const char *label) {
+  Serial.print("Pulsing ");
+  Serial.print(label);
+  Serial.println(" latch");
+
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+  delay(5);
+  digitalWrite(pin, LOW);
+  delay(PSU_LATCH_PULSE_MS);
+  digitalWrite(pin, HIGH);
+  delay(5);
+  pinMode(pin, INPUT);
+}
+
+bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool shouldBeOn) {
+  bool isOn = digitalRead(okPin) == HIGH;
+
+  Serial.print(label);
+  Serial.print(" rail currently ");
+  Serial.println(isOn ? "ON" : "OFF");
+
+  if (isOn == shouldBeOn) {
+    Serial.print(label);
+    Serial.println(" rail already in requested state");
+    return true;
+  }
+
+  pulseLatchLow(pulsePin, label);
+  delay(PSU_LATCH_SETTLE_MS);
+
+  bool nowOn = digitalRead(okPin) == HIGH;
+
+  Serial.print(label);
+  Serial.print(" rail after pulse ");
+  Serial.println(nowOn ? "ON" : "OFF");
+
+  return nowOn == shouldBeOn;
+}
+
 void powerPiAndRadioOn() {
-  pinMode(PI_RADIO_POWER_EN_PIN, OUTPUT);
-  digitalWrite(PI_RADIO_POWER_EN_PIN, LOW);
-  delay(10);
+  /*
+    Bring the Pi rail up first, then the radio rail. The Pi boot script waits
+    for JS8Call/radio readiness, so a short delay between rails is sufficient
+    for deterministic bench testing.
+  */
+  bool fiveOk = ensureRailState("5V", PSU_5V_PULSE_PIN, PSU_5V_OK_PIN, true);
+  delay(1000);
+  bool twelveOk = ensureRailState("12V", PSU_12V_PULSE_PIN, PSU_12V_OK_PIN, true);
+
+  if (!fiveOk || !twelveOk) {
+    Serial.println("WARNING: requested rail ON state was not confirmed");
+  }
 }
 
 void powerPiAndRadioOff() {
-  pinMode(PI_RADIO_POWER_EN_PIN, OUTPUT);
-  digitalWrite(PI_RADIO_POWER_EN_PIN, HIGH);
-  delay(10);
+  /*
+    Remove radio/ATU power first, then remove the Pi rail after Linux has had
+    PI_POWER_CUT_DELAY_MS to halt.
+  */
+  bool twelveOk = ensureRailState("12V", PSU_12V_PULSE_PIN, PSU_12V_OK_PIN, false);
+  delay(1000);
+  bool fiveOk = ensureRailState("5V", PSU_5V_PULSE_PIN, PSU_5V_OK_PIN, false);
+
+  if (!fiveOk || !twelveOk) {
+    Serial.println("WARNING: requested rail OFF state was not confirmed");
+  }
 }
 
 // ============================================================
@@ -398,7 +481,7 @@ void powerPiAndRadioOff() {
 void isolatePiUartBeforeSleep() {
   /*
     Prevent the ESP32 UART pins from back-powering the Raspberry Pi through
-    GPIO protection paths after the Pi/radio rail is switched off.
+    GPIO protection paths after the 5 V Pi rail is switched off.
   */
   PiSerial.end();
 
@@ -1116,25 +1199,14 @@ void enterDeepSleepForNextCycle() {
   showStage("S5 sleep set", 1500);
 
   /*
-    Active-low rail:
-      HIGH = rail OFF
-
-    Force GPIO33 HIGH immediately before sleep.
+    PCB V2 uses external flip-flop latches for the 5 V and 12 V rails. Once the
+    rails have been toggled off by powerPiAndRadioOff(), no ESP32 GPIO needs to
+    be held during deep sleep.
   */
-  pinMode(PI_RADIO_POWER_EN_PIN, OUTPUT);
-  digitalWrite(PI_RADIO_POWER_EN_PIN, HIGH);
-  delay(100);
+  configurePowerLatchPinsIdle();
 
   lastShutdownStage = 6;
-  showStage("S6 GPIO HIGH", 1500);
-
-  /*
-    Critical fix:
-    Hold GPIO33 in its HIGH state during deep sleep so the active-low enable
-    line does not float or fall LOW, which would re-enable the Pi/radio rail.
-  */
-  gpio_hold_en((gpio_num_t)PI_RADIO_POWER_EN_PIN);
-  gpio_deep_sleep_hold_en();
+  showStage("S6 latch idle", 1500);
 
   esp_sleep_enable_timer_wakeup(WAKE_INTERVAL_US);
 
@@ -1161,15 +1233,15 @@ void serviceShutdownSequence() {
 
   if (now - shutdownRequestTime >= PI_POWER_CUT_DELAY_MS) {
     lastShutdownStage = 1;
-    showStage("S1 cut rail", 1500);
+    showStage("S1 cut rails", 1500);
 
     powerPiAndRadioOff();
 
     lastShutdownStage = 2;
-    showStage("S2 rail off", 1500);
+    showStage("S2 rails off", 1500);
 
     /*
-      Give the Pi/radio rail time to collapse.
+      Give the 12 V and 5 V rails time to collapse.
     */
     delay(3000);
 
@@ -1202,20 +1274,10 @@ void setup() {
   delay(500);
 
   /*
-    Release GPIO hold applied before the previous deep-sleep cycle.
-    Without this, digitalWrite() may not regain control of GPIO33 after wake.
+    Configure V2 latch pulse outputs as high-impedance idle and status pins as
+    inputs before any display or rail-state diagnostics run.
   */
-  gpio_deep_sleep_hold_dis();
-  gpio_hold_dis((gpio_num_t)PI_RADIO_POWER_EN_PIN);
-
-  /*
-    Configure the power-enable GPIO early so the rail state is meaningful.
-
-    Active-low:
-      HIGH = rail OFF
-  */
-  pinMode(PI_RADIO_POWER_EN_PIN, OUTPUT);
-  digitalWrite(PI_RADIO_POWER_EN_PIN, HIGH);
+  configurePowerLatchPinsIdle();
 
   /*
     Initialise OLED before doing anything else so it can show reset/wake cause.
@@ -1232,14 +1294,11 @@ void setup() {
 
   /*
     Now start normal BearWave hardware supervisor behaviour.
-    Power the Pi/radio rail ON immediately.
-
-    Active-low:
-      LOW = rail ON
+    Power the V2 5 V and 12 V latched rails ON immediately.
   */
   powerPiAndRadioOn();
 
-  showStage("Rail ON", 1000);
+  showStage("Rails ON", 1000);
 
   pinMode(RTC_INT_PIN, INPUT_PULLUP);
 
@@ -1288,7 +1347,7 @@ void setup() {
   }
 
   /*
-    Ensure the rail remains ON after setup.
+    Ensure both V2 latched rails remain ON after setup.
   */
   powerPiAndRadioOn();
 

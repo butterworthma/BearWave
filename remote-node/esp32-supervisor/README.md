@@ -1,6 +1,6 @@
 # BearWave ESP32 Remote-Node Supervisor
 
-This repository contains the ESP32/Heltec supervisor firmware for the BearWave remote node. The ESP32 acts as the hardware authority for the node: it controls the Raspberry Pi and radio power rail, maintains GPS/RTC time, exposes node state to the Pi over UART, monitors alarm inputs, accepts shutdown signalling from the Pi, and enters deep sleep between wake cycles.
+This repository contains the ESP32/Heltec supervisor firmware for the BearWave remote node. The ESP32 acts as the hardware authority for the node: it controls the Raspberry Pi and radio power rails, maintains GPS/RTC time, exposes node state to the Pi over UART, monitors alarm inputs, accepts shutdown signalling from the Pi, and enters deep sleep between wake cycles.
 
 ## Current version
 
@@ -10,50 +10,32 @@ File:
 BearWave_ESP32_Remote_Node_Supervisor.ino
 ```
 
-This version includes the active-low GPIO 33 power-control fix and the deep-sleep GPIO hold fix.
+This version targets BearWave PCB V2, where the 5 V Raspberry Pi rail and 12 V radio/ATU rail are controlled separately through external flip-flop latch circuits.
 
 ## Hardware model
 
-GPIO 33 controls the combined switched rail for:
+BearWave PCB V2 separates the high-power rails:
 
-- Raspberry Pi
-- radio
+- 5 V rail for the Raspberry Pi Zero 2 W
+- 12 V rail for the QDX/radio/ATU path
 
-The enable line is active-low:
+Each rail has:
 
-```text
-GPIO 33 LOW  = Pi/radio rail ON
-GPIO 33 HIGH = Pi/radio rail OFF
-```
+- an active-low pulse input driven briefly by the ESP32
+- a rail-present status input read by the ESP32
 
-The ESP32 itself must remain powered from an always-on supply, for example the Heltec external battery path or an independent always-on regulator. The GPIO 33 switched rail should only control the Raspberry Pi and radio.
+The ESP32 itself must remain powered from an always-on supply, for example the Heltec external battery path or an independent always-on regulator. The latched 5 V and 12 V rails should only control the higher-power Pi and radio/ATU subsystems.
 
-## Why GPIO hold is required
+## Why GPIO hold is no longer used
 
-The Pi/radio enable line is active-low. Before deep sleep, the ESP32 drives GPIO 33 HIGH to turn the rail off. During ESP32 deep sleep, normal GPIO output drive may relax unless hold is enabled. If GPIO 33 floats or falls low during sleep, the Pi/radio rail can turn back on even though the ESP32 is asleep.
-
-The sketch therefore does this before deep sleep:
-
-```cpp
-pinMode(PI_RADIO_POWER_EN_PIN, OUTPUT);
-digitalWrite(PI_RADIO_POWER_EN_PIN, HIGH);
-gpio_hold_en((gpio_num_t)PI_RADIO_POWER_EN_PIN);
-gpio_deep_sleep_hold_en();
-```
-
-At the next boot, the sketch releases the hold before controlling GPIO 33 again:
-
-```cpp
-gpio_deep_sleep_hold_dis();
-gpio_hold_dis((gpio_num_t)PI_RADIO_POWER_EN_PIN);
-```
+The previous prototype held GPIO 33 during ESP32 deep sleep because it directly controlled a single active-low rail enable. PCB V2 moves this responsibility into external latch hardware. The ESP32 now sends a momentary pulse, reads back the rail state, and then leaves the pulse pin high-impedance. The latch, not the ESP32 GPIO drive state, preserves power state during deep sleep.
 
 ## Normal operating sequence
 
 1. ESP32 wakes.
-2. ESP32 releases any previous GPIO hold.
+2. ESP32 configures latch pulse pins as high-impedance idle inputs.
 3. ESP32 shows reset/wake diagnostics on the OLED.
-4. ESP32 powers the Pi/radio rail by driving GPIO 33 LOW.
+4. ESP32 turns on the 5 V rail, then the 12 V rail, using the latch pulse inputs and status feedback.
 5. ESP32 starts the RTC, GPS, OLED and Pi UART services.
 6. ESP32 attempts to refresh RTC time from GPS.
 7. Raspberry Pi boots and asks the ESP32 for time and state over UART.
@@ -64,9 +46,9 @@ gpio_hold_dis((gpio_num_t)PI_RADIO_POWER_EN_PIN);
 12. Raspberry Pi sends `SHUTDOWN` to the ESP32.
 13. ESP32 replies `OK,SHUTDOWN_RECEIVED`.
 14. ESP32 waits 50 seconds to allow Linux shutdown.
-15. ESP32 turns GPIO 33 HIGH, disabling the Pi/radio rail.
+15. ESP32 turns off the 12 V rail, then the 5 V rail, using the latch pulse inputs and status feedback.
 16. ESP32 isolates the Pi UART pins.
-17. ESP32 holds GPIO 33 HIGH and enters deep sleep.
+17. ESP32 returns latch pulse pins to high impedance and enters deep sleep.
 18. ESP32 wakes by timer and repeats.
 
 ## UART command interface
@@ -180,7 +162,7 @@ Last stage:<stage>
 Boot:<count>
 Reset:<reason>
 Wake:<reason>
-Rail:<ON/OFF>
+Rail:<5ON/5OFF>/<12ON/12OFF>
 ```
 
 Healthy sleep/wake behaviour should show:
@@ -211,11 +193,11 @@ The sketch stores the last shutdown stage in RTC memory.
 ```text
 0 = Pi sent SHUTDOWN and ESP32 accepted it
 1 = ESP32 started rail cut sequence
-2 = Pi/radio rail switched off
+2 = 12 V and 5 V rails switched off
 3 = preparing for sleep
 4 = Pi UART pins isolated
 5 = deep sleep setup started
-6 = GPIO 33 set HIGH and held for sleep
+6 = latch pulse pins returned to high-impedance idle before sleep
 99 = code continued after esp_deep_sleep_start(), which should not happen
 ```
 
@@ -225,7 +207,7 @@ A successful diagnostic run should usually show:
 Last stage:6
 Reset:DEEPSLEEP
 Wake:TIMER
-Rail:OFF
+Rail:5OFF/12OFF
 ```
 
 ## Timing settings
@@ -254,9 +236,12 @@ const uint64_t WAKE_INTERVAL_US = 15ULL * 60ULL * 1000000ULL;
 
 | Function | GPIO |
 |---|---:|
-| Pi/radio active-low enable | 33 |
-| Pi UART RX | 42 |
-| Pi UART TX | 41 |
+| 5 V latch pulse, active low | 17 |
+| 12 V latch pulse, active low | 45 |
+| 5 V rail-present status | 7 |
+| 12 V rail-present status | 6 |
+| Pi UART RX from Pi TX | 34 |
+| Pi UART TX to Pi RX | 33 |
 | RTC SDA | 2 |
 | RTC SCL | 3 |
 | RTC interrupt | 47 |
@@ -271,7 +256,7 @@ const uint64_t WAKE_INTERVAL_US = 15ULL * 60ULL * 1000000ULL;
 
 The Raspberry Pi should:
 
-1. Boot when GPIO 33 is driven LOW.
+1. Boot when the ESP32 confirms the 5 V latch is on.
 2. Read ESP32 time using `TIME?`.
 3. Set Linux UTC time.
 4. Start JS8Call.
@@ -280,12 +265,12 @@ The Raspberry Pi should:
 7. Send `EVENT_ACKED,<type>` after successful critical alarm delivery.
 8. Send `SHUTDOWN` before halting.
 
-The ESP32 then cuts power and sleeps.
+The ESP32 then turns off the 12 V and 5 V latches and sleeps.
 
 ## Notes for deployment
 
 - Keep the ESP32 on an always-on supply.
-- The Pi/radio rail should be switched by GPIO 33 only.
+- The 5 V and 12 V rails should be switched through the PCB V2 latch pulse inputs only.
 - Avoid USB serial during full power testing because USB can back-feed the Pi.
 - Use the OLED diagnostic values to confirm reset/wake cause.
 - Once the behaviour is proven, set the wake interval to the required field-test interval.
