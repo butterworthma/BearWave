@@ -145,11 +145,14 @@
 #define PSU_12V_PULSE_PIN  45
 #define PSU_5V_OK_PIN      7
 #define PSU_12V_OK_PIN     6
+#define PSU_5V_OK_ACTIVE_LEVEL   HIGH
+#define PSU_12V_OK_ACTIVE_LEVEL  LOW
 
 /*
   V2 power latch convention:
     ENABLE5VPULSE / ENABLE12VPULSE are active-low momentary pulse inputs.
-    5VOK / 12VOK are rail-present status inputs and are treated as active-high.
+    5VOK / 12VOK are rail-present status inputs. The current PCB V2 bench unit
+    presents 5VOK as active-high and 12VOK as active-low.
 
   GPIO assignments from the Paper 3 BearWave PCB V2 schematic:
     PIUARTTX      -> GPIO34  (ESP32 RX from Raspberry Pi TX)
@@ -308,8 +311,8 @@ String wakeReasonText() {
 }
 
 String railStateText() {
-  String five = digitalRead(PSU_5V_OK_PIN) == HIGH ? "5ON" : "5OFF";
-  String twelve = digitalRead(PSU_12V_OK_PIN) == HIGH ? "12ON" : "12OFF";
+  String five = digitalRead(PSU_5V_OK_PIN) == PSU_5V_OK_ACTIVE_LEVEL ? "5ON" : "5OFF";
+  String twelve = digitalRead(PSU_12V_OK_PIN) == PSU_12V_OK_ACTIVE_LEVEL ? "12ON" : "12OFF";
   return five + "/" + twelve;
 }
 
@@ -385,11 +388,11 @@ void displayReset(void) {
 // ============================================================
 
 bool rail5VOn() {
-  return digitalRead(PSU_5V_OK_PIN) == HIGH;
+  return digitalRead(PSU_5V_OK_PIN) == PSU_5V_OK_ACTIVE_LEVEL;
 }
 
 bool rail12VOn() {
-  return digitalRead(PSU_12V_OK_PIN) == HIGH;
+  return digitalRead(PSU_12V_OK_PIN) == PSU_12V_OK_ACTIVE_LEVEL;
 }
 
 void configurePowerLatchPinsIdle() {
@@ -401,8 +404,8 @@ void configurePowerLatchPinsIdle() {
   pinMode(PSU_5V_PULSE_PIN, INPUT);
   pinMode(PSU_12V_PULSE_PIN, INPUT);
 
-  pinMode(PSU_5V_OK_PIN, INPUT);
-  pinMode(PSU_12V_OK_PIN, INPUT);
+  pinMode(PSU_5V_OK_PIN, INPUT_PULLDOWN);
+  pinMode(PSU_12V_OK_PIN, INPUT_PULLUP);
 }
 
 void pulseLatchLow(uint8_t pin, const char *label) {
@@ -421,7 +424,8 @@ void pulseLatchLow(uint8_t pin, const char *label) {
 }
 
 bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool shouldBeOn) {
-  bool isOn = digitalRead(okPin) == HIGH;
+  bool activeLevel = okPin == PSU_12V_OK_PIN ? PSU_12V_OK_ACTIVE_LEVEL : PSU_5V_OK_ACTIVE_LEVEL;
+  bool isOn = digitalRead(okPin) == activeLevel;
 
   Serial.print(label);
   Serial.print(" rail currently ");
@@ -436,7 +440,7 @@ bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool sh
   pulseLatchLow(pulsePin, label);
   delay(PSU_LATCH_SETTLE_MS);
 
-  bool nowOn = digitalRead(okPin) == HIGH;
+  bool nowOn = digitalRead(okPin) == activeLevel;
 
   Serial.print(label);
   Serial.print(" rail after pulse ");

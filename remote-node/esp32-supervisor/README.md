@@ -24,6 +24,8 @@ Each rail has:
 - an active-low pulse input driven briefly by the ESP32
 - a rail-present status input read by the ESP32
 
+On the current PCB V2 bench unit, `5VOK` is active-high and `12VOK` is active-low. The firmware therefore uses `INPUT_PULLDOWN` for `5VOK`, `INPUT_PULLUP` for `12VOK`, and per-rail active-level constants rather than assuming both feedback lines use the same polarity.
+
 The ESP32 itself must remain powered from an always-on supply, for example the Heltec external battery path or an independent always-on regulator. The latched 5 V and 12 V rails should only control the higher-power Pi and radio/ATU subsystems.
 
 ## Why GPIO hold is no longer used
@@ -238,8 +240,8 @@ const uint64_t WAKE_INTERVAL_US = 15ULL * 60ULL * 1000000ULL;
 |---|---:|
 | 5 V latch pulse, active low | 17 |
 | 12 V latch pulse, active low | 45 |
-| 5 V rail-present status | 7 |
-| 12 V rail-present status | 6 |
+| 5 V rail-present status, active high | 7 |
+| 12 V rail-present status, active low | 6 |
 | Pi UART RX from Pi TX | 34 |
 | Pi UART TX to Pi RX | 33 |
 | RTC SDA | 2 |
