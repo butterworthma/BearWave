@@ -21,36 +21,36 @@ BearWave PCB V2 separates the high-power rails:
 
 Each rail has:
 
-- an active-low pulse input driven briefly by the ESP32
+- a pulse input driven briefly by the ESP32
 - a rail-present status input read by the ESP32
 
-On the current PCB V2 bench unit, `5VOK` is active-high and `12VOK` is active-low. The firmware therefore uses `INPUT_PULLDOWN` for `5VOK`, `INPUT_PULLUP` for `12VOK`, and per-rail active-level constants rather than assuming both feedback lines use the same polarity.
+On the current PCB V2 bench unit, the latch inputs respond to a short driven-HIGH pulse on the Heltec GPIO pins. The firmware keeps the pulse outputs LOW when idle, drives them HIGH for the configured pulse width, then returns them LOW. Both `5VOK` and `12VOK` are active-low rail-present inputs, so the firmware enables ESP32 internal pull-ups: rail OFF reads HIGH and rail ON reads LOW.
 
 The ESP32 itself must remain powered from an always-on supply, for example the Heltec external battery path or an independent always-on regulator. The latched 5 V and 12 V rails should only control the higher-power Pi and radio/ATU subsystems.
 
 ## Why GPIO hold is no longer used
 
-The previous prototype held GPIO 33 during ESP32 deep sleep because it directly controlled a single active-low rail enable. PCB V2 moves this responsibility into external latch hardware. The ESP32 now sends a momentary pulse, reads back the rail state, and then leaves the pulse pin high-impedance. The latch, not the ESP32 GPIO drive state, preserves power state during deep sleep.
+The previous prototype held GPIO 33 during ESP32 deep sleep because it directly controlled a single active-low rail enable. PCB V2 moves this responsibility into external latch hardware. The ESP32 now sends a momentary HIGH pulse and reads back the rail state. The latch, not the ESP32 GPIO drive state, preserves power state during deep sleep.
 
 ## Normal operating sequence
 
 1. ESP32 wakes.
-2. ESP32 configures latch pulse pins as high-impedance idle inputs.
+2. ESP32 configures latch pulse pins as LOW idle outputs and rail status pins as pulled-up inputs.
 3. ESP32 shows reset/wake diagnostics on the OLED.
-4. ESP32 turns on the 5 V rail, then the 12 V rail, using the latch pulse inputs and status feedback.
+4. ESP32 forces the 12 V and 5 V rails OFF, then holds them off briefly for visible bench confirmation.
 5. ESP32 starts the RTC, GPS, OLED and Pi UART services.
 6. ESP32 attempts to refresh RTC time from GPS.
-7. Raspberry Pi boots and asks the ESP32 for time and state over UART.
-8. Raspberry Pi runs JS8Call and the BearWave remote-node Python application.
-9. Raspberry Pi sends the BearWave heartbeat or alarm message.
-10. Raspberry Pi waits for the control-node acknowledgement.
-11. Raspberry Pi sends `EVENT_ACKED,<type>` if a critical event was delivered.
-12. Raspberry Pi sends `SHUTDOWN` to the ESP32.
-13. ESP32 replies `OK,SHUTDOWN_RECEIVED`.
-14. ESP32 waits 50 seconds to allow Linux shutdown.
-15. ESP32 turns off the 12 V rail, then the 5 V rail, using the latch pulse inputs and status feedback.
-16. ESP32 isolates the Pi UART pins.
-17. ESP32 returns latch pulse pins to high impedance and enters deep sleep.
+7. ESP32 turns on the 5 V rail, then the 12 V rail, using latch pulses and status feedback.
+8. Raspberry Pi boots and asks the ESP32 for time and state over UART.
+9. Raspberry Pi runs JS8Call and the BearWave remote-node Python application.
+10. Raspberry Pi sends the BearWave heartbeat or alarm message.
+11. Raspberry Pi waits for the control-node acknowledgement.
+12. Raspberry Pi sends `EVENT_ACKED,<type>` if a critical event was delivered.
+13. Raspberry Pi sends `SHUTDOWN` to the ESP32.
+14. ESP32 replies `OK,SHUTDOWN_RECEIVED`.
+15. ESP32 waits 50 seconds to allow Linux shutdown.
+16. ESP32 turns off the 12 V rail, then the 5 V rail, using latch pulses and status feedback.
+17. ESP32 isolates the Pi UART pins, turns the OLED off, and enters deep sleep.
 18. ESP32 wakes by timer and repeats.
 
 ## UART command interface
@@ -199,7 +199,7 @@ The sketch stores the last shutdown stage in RTC memory.
 3 = preparing for sleep
 4 = Pi UART pins isolated
 5 = deep sleep setup started
-6 = latch pulse pins returned to high-impedance idle before sleep
+6 = OLED off and deep sleep setup started
 99 = code continued after esp_deep_sleep_start(), which should not happen
 ```
 
@@ -225,7 +225,7 @@ This gives the Raspberry Pi 50 seconds to halt cleanly before power is removed.
 The current diagnostic wake interval is:
 
 ```cpp
-const uint64_t WAKE_INTERVAL_US = 60ULL * 1000000ULL;
+const uint64_t WAKE_INTERVAL_US = 5ULL * 60ULL * 1000000ULL;
 ```
 
 For a 15-minute test cycle, change it to:
@@ -238,21 +238,21 @@ const uint64_t WAKE_INTERVAL_US = 15ULL * 60ULL * 1000000ULL;
 
 | Function | GPIO |
 |---|---:|
-| 5 V latch pulse, active low | 17 |
-| 12 V latch pulse, active low | 45 |
-| 5 V rail-present status, active high | 7 |
-| 12 V rail-present status, active low | 6 |
-| Pi UART RX from Pi TX | 34 |
-| Pi UART TX to Pi RX | 33 |
-| RTC SDA | 2 |
-| RTC SCL | 3 |
-| RTC interrupt | 47 |
-| GPS RX | 4 |
-| GPS TX | 5 |
+| 5 V latch pulse, driven HIGH briefly | 7 |
+| 12 V latch pulse, driven HIGH briefly | 38 |
+| 5 V rail-present status, active low | 47 |
+| 12 V rail-present status, active low | 48 |
+| Pi UART RX from Pi TX | 33 |
+| Pi UART TX to Pi RX | 34 |
+| RTC SDA | 40 |
+| RTC SCL | 39 |
+| RTC interrupt | 6 |
+| GPS RX | 41 |
+| GPS TX | 42 |
 | GPS/VEXT control | 36 |
-| Battery ADC | 20 |
-| Trap input 1 | 48 |
-| Trap input 2 | 26 |
+| Battery ADC | 2 |
+| Trap input 1 | 5 |
+| Trap input 2 | 4 |
 
 ## Integration with BearWave Pi software
 

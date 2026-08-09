@@ -33,6 +33,8 @@ VENV_PYTHON="${BEARWAVE_DIR}/.venv/bin/python"
 ESP32_PORT="/dev/serial0"
 ESP32_BAUD="115200"
 
+QDX_CAT_PORT="${BEARWAVE_QDX_CAT_PORT:-/dev/ttyACM0}"
+
 JS8_HOST="127.0.0.1"
 JS8_PORT="2442"
 JS8_DIAL_HZ="7078000"
@@ -115,6 +117,7 @@ export BEARWAVE_CONTROL_CALLSIGN="${BEARWAVE_CONTROL_CALLSIGN:-G7PRW}"
 echo "[BOOT] Node ID: ${BEARWAVE_NODE_ID}"
 echo "[BOOT] Control callsign: ${BEARWAVE_CONTROL_CALLSIGN}"
 echo "[BOOT] ESP32 UART: ${ESP32_PORT} @ ${ESP32_BAUD}"
+echo "[BOOT] QDX CAT port: ${QDX_CAT_PORT}"
 echo "[BOOT] JS8 API: ${JS8_HOST}:${JS8_PORT}"
 echo "[BOOT] JS8 dial frequency: ${JS8_DIAL_HZ} Hz"
 echo "[BOOT] JS8 desktop launcher: ${JS8_DESKTOP_FILE}"
@@ -143,6 +146,38 @@ done
 
 if [ ! -e "${ESP32_PORT}" ]; then
   echo "[BOOT] ERROR: ${ESP32_PORT} did not appear"
+  shutdown -h now
+  exit 1
+fi
+
+# -------------------------------------------------------------------
+# Step 1b: wait for QDX USB CAT/audio
+# -------------------------------------------------------------------
+#
+# JS8Call is configured to use the QDX CAT interface at /dev/ttyACM0. If
+# JS8Call starts before the USB ACM device exists, Hamlib can fail to open the
+# rig and the JS8Call TCP API may never become available to the BearWave app.
+# -------------------------------------------------------------------
+
+echo "[BOOT] Waiting for QDX CAT port ${QDX_CAT_PORT}"
+
+for i in $(seq 1 30); do
+  if [ -e "${QDX_CAT_PORT}" ]; then
+    echo "[BOOT] Found QDX CAT port ${QDX_CAT_PORT}"
+    break
+  fi
+
+  echo "[BOOT] ${QDX_CAT_PORT} not present yet, attempt ${i}/30"
+  sleep 1
+done
+
+if [ ! -e "${QDX_CAT_PORT}" ]; then
+  echo "[BOOT] ERROR: QDX CAT port ${QDX_CAT_PORT} did not appear"
+
+  "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
+    --port "${ESP32_PORT}" \
+    --baud "${ESP32_BAUD}" || true
+
   shutdown -h now
   exit 1
 fi
@@ -316,9 +351,13 @@ echo "[BOOT] BearWave remote-node application exited with code ${APP_RC}"
 
 echo "[BOOT] Sending fallback SHUTDOWN request to ESP32"
 
-"${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
+if ! "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
   --port "${ESP32_PORT}" \
-  --baud "${ESP32_BAUD}" || true
+  --baud "${ESP32_BAUD}"; then
+  echo "[BOOT] ERROR: ESP32 did not acknowledge fallback SHUTDOWN request"
+  echo "[BOOT] Leaving Raspberry Pi running so the fault can be inspected"
+  exit 20
+fi
 
 # -------------------------------------------------------------------
 # Step 7: halt Linux

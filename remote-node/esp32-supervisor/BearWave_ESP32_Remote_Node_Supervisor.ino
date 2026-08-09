@@ -17,9 +17,10 @@
       - 12 V rail for the QDX/radio/ATU path
 
     The ESP32 does not hold a rail-enable level during deep sleep. Instead, it
-    briefly pulls the relevant ENABLE*PULSE line LOW to emulate a push-button
-    pulse, then releases the pin back to high impedance. The latch preserves
-    the rail state while the ESP32 sleeps.
+    briefly drives the relevant ENABLE*PULSE line HIGH to emulate the latch
+    push-button pulse proven on the PCB V2 bench unit, then returns the output
+    LOW while idle. The external latch preserves the rail state while the ESP32
+    sleeps.
 
     Rail status is read back using 5VOK and 12VOK so the firmware only pulses a
     latch when the measured rail state does not match the requested state.
@@ -84,7 +85,7 @@
       turns off the 5 V rail, isolates the Pi UART pins, and enters deep sleep.
 
   Test/deployment note:
-    WAKE_INTERVAL_US is currently set to 60 seconds for test. Change it back
+    WAKE_INTERVAL_US is currently set to 5 minutes for test. Change it back
     to 15 minutes once the behaviour is proven.
 */
 
@@ -99,9 +100,9 @@
 // RTC DS3231 configuration
 // ============================================================
 
-#define RTC_SDA_PIN    2
-#define RTC_SCL_PIN    3
-#define RTC_INT_PIN    47
+#define RTC_SDA_PIN    40
+#define RTC_SCL_PIN    39
+#define RTC_INT_PIN    6
 #define DS3231_ADDR    0x68
 
 // ============================================================
@@ -109,15 +110,15 @@
 // ============================================================
 
 #define VEXT_CTRL_PIN  36
-#define GPS_RX_PIN     4
-#define GPS_TX_PIN     5
+#define GPS_RX_PIN     41
+#define GPS_TX_PIN     42
 #define GPS_BAUD       9600
 
 // ============================================================
 // Battery measurement configuration
 // ============================================================
 
-#define BATTERY_ADC_PIN 20
+#define BATTERY_ADC_PIN 2
 
 #define ADC_MAX_COUNTS        4095.0f
 #define ADC_REF_VOLTAGE       3.3f
@@ -133,55 +134,66 @@
 // Raspberry Pi UART configuration
 // ============================================================
 
-#define PI_UART_RX_PIN 34
-#define PI_UART_TX_PIN 33
+#define PI_UART_RX_PIN 33
+#define PI_UART_TX_PIN 34
 #define PI_UART_BAUD   115200
 
 // ============================================================
 // BearWave PCB V2 latch-based power control
 // ============================================================
 
-#define PSU_5V_PULSE_PIN   17
-#define PSU_12V_PULSE_PIN  45
-#define PSU_5V_OK_PIN      7
-#define PSU_12V_OK_PIN     6
-#define PSU_5V_OK_ACTIVE_LEVEL   HIGH
+#define PSU_5V_PULSE_PIN   7
+#define PSU_12V_PULSE_PIN  38
+#define PSU_5V_OK_PIN      47
+#define PSU_12V_OK_PIN     48
+#define PSU_5V_OK_ACTIVE_LEVEL   LOW
 #define PSU_12V_OK_ACTIVE_LEVEL  LOW
 
 /*
   V2 power latch convention:
     ENABLE5VPULSE / ENABLE12VPULSE are active-low momentary pulse inputs.
     5VOK / 12VOK are rail-present status inputs. The current PCB V2 bench unit
-    presents 5VOK as active-high and 12VOK as active-low.
+    presents both 5VOK and 12VOK as active-low open-drain/open-collector style
+    signals. The ESP32 enables internal pull-ups so OFF reads HIGH and ON reads
+    LOW.
 
-  GPIO assignments from the Paper 3 BearWave PCB V2 schematic:
-    PIUARTTX      -> GPIO34  (ESP32 RX from Raspberry Pi TX)
-    PIUARTRX      -> GPIO33  (ESP32 TX to Raspberry Pi RX)
-    5VOK          -> GPIO7
-    12VOK         -> GPIO6
-    ENABLE5VPULSE -> GPIO17
-    ENABLE12VPULSE-> GPIO45
+  Confirmed PCB V2 ESP32 GPIO assignments:
+    PI UART RX    -> GPIO33  (ESP32 receives from Raspberry Pi TX)
+    PI UART TX    -> GPIO34  (ESP32 transmits to Raspberry Pi RX)
+    GPS UART RX   -> GPIO41  (ESP32 receives from GPS TX)
+    GPS UART TX   -> GPIO42  (ESP32 transmits to GPS RX)
+    RTC SDA       -> GPIO40
+    RTC SCL       -> GPIO39
+    RTC INT       -> GPIO6
+    5VOK          -> GPIO47
+    12VOK         -> GPIO48
+    ENABLE5VPULSE -> GPIO7
+    ENABLE12VPULSE-> GPIO38
+    Battery ADC   -> GPIO2
+    Trap switch 1 -> GPIO5
+    Trap switch 2 -> GPIO4
 */
 const unsigned long PSU_LATCH_PULSE_MS = 250UL;
 const unsigned long PSU_LATCH_SETTLE_MS = 1000UL;
 const unsigned long PI_POWER_CUT_DELAY_MS = 50000UL;
+const unsigned long PI_MAX_ON_TIME_MS = 20UL * 60UL * 1000UL;
 
 /*
   TEST SLEEP INTERVAL
   -------------------
-  Current value is 60 seconds for diagnostics.
+  Current value is 5 minutes for diagnostics.
 
   For the 15-minute test cycle, use:
     const uint64_t WAKE_INTERVAL_US = 15ULL * 60ULL * 1000000ULL;
 */
-const uint64_t WAKE_INTERVAL_US = 60ULL * 1000000ULL;
+const uint64_t WAKE_INTERVAL_US = 5ULL * 60ULL * 1000000ULL;
 
 // ============================================================
 // Trap/alarm input configuration
 // ============================================================
 
-#define TRAP_PIN_1 48
-#define TRAP_PIN_2 26
+#define TRAP_PIN_1 5
+#define TRAP_PIN_2 4
 
 // ============================================================
 // General timing configuration
@@ -190,7 +202,7 @@ const uint64_t WAKE_INTERVAL_US = 60ULL * 1000000ULL;
 const unsigned long DISPLAY_UPDATE_MS       = 1000UL;
 const unsigned long RTC_CHECK_INTERVAL_MS   = 15000UL;
 const unsigned long GPS_POWERUP_DELAY_MS    = 3000UL;
-const unsigned long GPS_SYNC_TIMEOUT_MS     = 10000UL;
+const unsigned long GPS_SYNC_TIMEOUT_MS     = 180000UL;
 const unsigned long GPS_FRESH_AGE_MS        = 2000UL;
 const long MAX_ALLOWED_DRIFT_SECONDS        = 1;
 const unsigned long EVENT_POLL_INTERVAL_MS  = 200UL;
@@ -222,6 +234,8 @@ HardwareSerial PiSerial(2);
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastRtcCheck = 0;
 unsigned long lastEventPoll = 0;
+unsigned long highPowerRailsOnAt = 0;
+bool highPowerRailsRequestedOn = false;
 
 // ============================================================
 // Pi UART receive buffer
@@ -257,6 +271,7 @@ void servicePiUart();
 void updateEventState();
 void updateDisplay();
 void serviceShutdownSequence();
+void serviceHighPowerFailsafe();
 
 // ============================================================
 // Text helpers for reset/wake diagnostics
@@ -397,30 +412,31 @@ bool rail12VOn() {
 
 void configurePowerLatchPinsIdle() {
   /*
-    The latch pulse inputs are pulled high on the PCB and the manual switches
-    pull them low. Keep ESP32 pins high-impedance during idle so the firmware
-    does not fight a manual button press.
+    The BearWave PCB V2 latch inputs have been bench-proven to respond to a
+    driven HIGH pulse from the Heltec GPIO. Keep the pulse outputs LOW when
+    idle, then briefly drive HIGH to emulate the latch push.
   */
-  pinMode(PSU_5V_PULSE_PIN, INPUT);
-  pinMode(PSU_12V_PULSE_PIN, INPUT);
+  pinMode(PSU_5V_PULSE_PIN, OUTPUT);
+  pinMode(PSU_12V_PULSE_PIN, OUTPUT);
+  digitalWrite(PSU_5V_PULSE_PIN, LOW);
+  digitalWrite(PSU_12V_PULSE_PIN, LOW);
 
-  pinMode(PSU_5V_OK_PIN, INPUT_PULLDOWN);
+  pinMode(PSU_5V_OK_PIN, INPUT_PULLUP);
   pinMode(PSU_12V_OK_PIN, INPUT_PULLUP);
 }
 
-void pulseLatchLow(uint8_t pin, const char *label) {
+void pulseLatchHigh(uint8_t pin, const char *label) {
   Serial.print("Pulsing ");
   Serial.print(label);
   Serial.println(" latch");
 
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
-  delay(5);
   digitalWrite(pin, LOW);
-  delay(PSU_LATCH_PULSE_MS);
+  delay(20);
   digitalWrite(pin, HIGH);
-  delay(5);
-  pinMode(pin, INPUT);
+  delay(PSU_LATCH_PULSE_MS);
+  digitalWrite(pin, LOW);
+  delay(20);
 }
 
 bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool shouldBeOn) {
@@ -431,13 +447,17 @@ bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool sh
   Serial.print(" rail currently ");
   Serial.println(isOn ? "ON" : "OFF");
 
+  showStage(String(label) + (isOn ? " is ON" : " is OFF"), 800);
+
   if (isOn == shouldBeOn) {
     Serial.print(label);
     Serial.println(" rail already in requested state");
+    showStage(String(label) + " already OK", 800);
     return true;
   }
 
-  pulseLatchLow(pulsePin, label);
+  showStage(String("Pulse ") + label, 800);
+  pulseLatchHigh(pulsePin, label);
   delay(PSU_LATCH_SETTLE_MS);
 
   bool nowOn = digitalRead(okPin) == activeLevel;
@@ -445,6 +465,8 @@ bool ensureRailState(const char *label, uint8_t pulsePin, uint8_t okPin, bool sh
   Serial.print(label);
   Serial.print(" rail after pulse ");
   Serial.println(nowOn ? "ON" : "OFF");
+
+  showStage(String(label) + (nowOn == shouldBeOn ? " OK" : " FAIL"), 1500);
 
   return nowOn == shouldBeOn;
 }
@@ -456,15 +478,27 @@ void powerPiAndRadioOn() {
     for deterministic bench testing.
   */
   bool fiveOk = ensureRailState("5V", PSU_5V_PULSE_PIN, PSU_5V_OK_PIN, true);
+
+  if (!fiveOk) {
+    Serial.println("ERROR: 5V rail did not confirm ON; leaving 12V rail off");
+    showStage("5V ON FAIL", 2500);
+    return;
+  }
+
   delay(1000);
   bool twelveOk = ensureRailState("12V", PSU_12V_PULSE_PIN, PSU_12V_OK_PIN, true);
+
+  if (fiveOk || twelveOk) {
+    highPowerRailsRequestedOn = true;
+    highPowerRailsOnAt = millis();
+  }
 
   if (!fiveOk || !twelveOk) {
     Serial.println("WARNING: requested rail ON state was not confirmed");
   }
 }
 
-void powerPiAndRadioOff() {
+bool powerPiAndRadioOff() {
   /*
     Remove radio/ATU power first, then remove the Pi rail after Linux has had
     PI_POWER_CUT_DELAY_MS to halt.
@@ -473,9 +507,57 @@ void powerPiAndRadioOff() {
   delay(1000);
   bool fiveOk = ensureRailState("5V", PSU_5V_PULSE_PIN, PSU_5V_OK_PIN, false);
 
-  if (!fiveOk || !twelveOk) {
+  bool offOk = fiveOk && twelveOk;
+
+  if (!offOk) {
     Serial.println("WARNING: requested rail OFF state was not confirmed");
+  } else {
+    highPowerRailsRequestedOn = false;
+    highPowerRailsOnAt = 0;
   }
+
+  return offOk;
+}
+
+bool normaliseRailsOffAtBoot() {
+  /*
+    Flip-flop latches preserve their state across ESP32 resets and sleep. During
+    bench testing that can leave the 5 V or 12 V rail on before the supervisor
+    starts a fresh cycle. Force both high-power rails off first so the later
+    boot sequence always starts from a known state.
+  */
+  showStage("Check rails", 1000);
+
+  bool twelveOffOk = ensureRailState("12V", PSU_12V_PULSE_PIN, PSU_12V_OK_PIN, false);
+  delay(1000);
+  bool fiveOffOk = ensureRailState("5V", PSU_5V_PULSE_PIN, PSU_5V_OK_PIN, false);
+
+  if (twelveOffOk && fiveOffOk) {
+    showStage("Rails are OFF", 1500);
+    return true;
+  }
+
+  showStage("Rail off FAIL", 2500);
+  Serial.println("WARNING: one or more rails failed to confirm OFF at boot");
+  return false;
+}
+
+void bootRailControlTest() {
+  /*
+    Bench-test the latch control path on every ESP32 boot:
+      1. read rail state
+      2. force 12 V and 5 V off
+      3. hold off for 5 seconds so the operator can confirm the rails dropped
+
+    The rails remain OFF after this test. They are turned back ON later only
+    when the supervisor is ready to wake the Pi/radio for a heartbeat or alarm
+    cycle.
+  */
+  showStage("Rail boot test", 1500);
+
+  normaliseRailsOffAtBoot();
+
+  showStage("Rails OFF hold", 5000);
 }
 
 // ============================================================
@@ -1216,6 +1298,11 @@ void enterDeepSleepForNextCycle() {
 
   showStage("Entering sleep", 2500);
 
+  display.clear();
+  display.display();
+  VextOFF();
+  delay(50);
+
   esp_deep_sleep_start();
 
   /*
@@ -1239,10 +1326,20 @@ void serviceShutdownSequence() {
     lastShutdownStage = 1;
     showStage("S1 cut rails", 1500);
 
-    powerPiAndRadioOff();
+    bool railsOff = powerPiAndRadioOff();
 
     lastShutdownStage = 2;
     showStage("S2 rails off", 1500);
+
+    if (!railsOff) {
+      /*
+        The high-power rails are controlled by flip-flop latches. If the status
+        feedback does not confirm OFF, do not blindly retry: a second pulse can
+        toggle the latch back ON and reboot the Pi. Continue toward sleep after
+        one off attempt and leave the diagnostic visible briefly.
+      */
+      showStage("Rail off unsure", 3000);
+    }
 
     /*
       Give the 12 V and 5 V rails time to collapse.
@@ -1267,6 +1364,31 @@ void serviceShutdownSequence() {
   }
 }
 
+void serviceHighPowerFailsafe() {
+  if (!highPowerRailsRequestedOn || shutdownRequested) {
+    return;
+  }
+
+  if (!rail5VOn() && !rail12VOn()) {
+    highPowerRailsRequestedOn = false;
+    highPowerRailsOnAt = 0;
+    return;
+  }
+
+  unsigned long now = millis();
+
+  if (now - highPowerRailsOnAt < PI_MAX_ON_TIME_MS) {
+    return;
+  }
+
+  Serial.println("ERROR: high-power rail failsafe elapsed; cutting rails");
+  showStage("Failsafe cut", 2500);
+
+  shutdownRequested = true;
+  shutdownRequestTime = millis() - PI_POWER_CUT_DELAY_MS;
+  lastShutdownStage = 0;
+}
+
 // ============================================================
 // setup()
 // ============================================================
@@ -1278,8 +1400,8 @@ void setup() {
   delay(500);
 
   /*
-    Configure V2 latch pulse outputs as high-impedance idle and status pins as
-    inputs before any display or rail-state diagnostics run.
+    Configure V2 latch pulse outputs to their LOW idle state and status pins as
+    pulled-up inputs before any display or rail-state diagnostics run.
   */
   configurePowerLatchPinsIdle();
 
@@ -1296,13 +1418,7 @@ void setup() {
   showStage("Boot diag", 1500);
   showLastBootDetails(5000);
 
-  /*
-    Now start normal BearWave hardware supervisor behaviour.
-    Power the V2 5 V and 12 V latched rails ON immediately.
-  */
-  powerPiAndRadioOn();
-
-  showStage("Rails ON", 1000);
+  bootRailControlTest();
 
   pinMode(RTC_INT_PIN, INPUT_PULLUP);
 
@@ -1351,9 +1467,13 @@ void setup() {
   }
 
   /*
-    Ensure both V2 latched rails remain ON after setup.
+    The high-power rails have deliberately been kept OFF until this point.
+    Once GPS/RTC startup is complete, wake the Pi and radio path so the Pi can
+    send the scheduled heartbeat or handle a latched alarm.
   */
+  showStage("Wake Pi/radio", 1000);
   powerPiAndRadioOn();
+  showStage("Rails ON", 1000);
 
   lastDisplayUpdate = 0;
   lastRtcCheck = millis();
@@ -1379,6 +1499,7 @@ void loop() {
   updateDisplay();
 
   serviceShutdownSequence();
+  serviceHighPowerFailsafe();
 
   unsigned long now = millis();
 

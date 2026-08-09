@@ -48,19 +48,21 @@ The service runs as root because it sets system time, launches GUI JS8Call into 
 ## Wake Cycle Summary
 
 1. ESP32 wakes from timer or event.
-2. ESP32 drives GPIO 33 LOW, powering the Pi and QDX/radio rail.
-3. Raspberry Pi boots into the graphical target.
-4. `bearwave-cycle.service` runs `remote-pi/scripts/bearwave_boot_cycle.sh`.
-5. The boot script waits for `/dev/serial0`.
-6. The Pi asks the ESP32 for UTC time with `TIME?`.
-7. The Pi starts JS8Call from the desktop launcher.
-8. The Pi sets JS8Call to 7.078 MHz.
-9. The Python app in `remote-pi/app/` sends heartbeat, trap alarm, low-battery, or pending critical messages.
-10. The Pi waits for the control-node ACK.
-11. If an alarm is acknowledged and SSTV is enabled, the Pi captures, encodes, and transmits one SSTV image.
-12. The Pi sends `EVENT_ACKED,<type>` for delivered critical events.
-13. The Pi sends `SHUTDOWN` to the ESP32 and halts Linux.
-14. ESP32 waits for Linux shutdown, drives GPIO 33 HIGH, holds the pin through deep sleep, and sleeps until the next wake.
+2. ESP32 checks the latched 5 V and 12 V rail feedback lines and forces both rails OFF so each cycle starts from a known state.
+3. ESP32 refreshes GPS/RTC state, then pulses the 5 V latch on and pulses the 12 V latch on.
+4. Raspberry Pi boots into the graphical target.
+5. `bearwave-cycle.service` runs `remote-pi/scripts/bearwave_boot_cycle.sh`.
+6. The boot script waits for the ESP32 UART at `/dev/serial0`.
+7. The boot script waits for the QDX CAT/audio device at `/dev/ttyACM0` before launching JS8Call.
+8. The Pi asks the ESP32 for UTC time with `TIME?`.
+9. The Pi starts JS8Call from the desktop launcher.
+10. The Pi waits for the JS8Call TCP API on `127.0.0.1:2442`, then sets JS8Call to 7.078 MHz.
+11. The Python app in `remote-pi/app/` sends heartbeat, trap alarm, low-battery, or pending critical messages.
+12. The Pi waits for the control-node ACK.
+13. If an alarm is acknowledged and SSTV is enabled, the Pi captures, encodes, and transmits one SSTV image.
+14. The Pi sends `EVENT_ACKED,<type>` for delivered critical events.
+15. The Pi sends `SHUTDOWN` to the ESP32 and halts Linux.
+16. ESP32 waits for Linux shutdown, pulses the 12 V latch off, pulses the 5 V latch off, turns the OLED off, and sleeps until the next wake.
 
 ## Current SSTV Extension
 
@@ -167,7 +169,7 @@ tail -f /home/mark/bearwave/logs/boot_cycle.log
 Before unattended testing, start JS8Call manually once and confirm:
 
 - Station callsign is configured.
-- TCP API is enabled on `127.0.0.1:2442`.
+- TCP API and TCP request acceptance are enabled on `127.0.0.1:2442`.
 - The QDX/radio audio device is selected.
 - CAT/PTT works from JS8Call.
 - The saved desktop profile starts correctly from `/usr/share/applications/js8call.desktop`.
@@ -210,7 +212,9 @@ esp32-supervisor/BearWave_ESP32_Remote_Node_Supervisor.ino
 
 It controls:
 
-- Pi/radio switched rail on GPIO 33, active-low.
+- 5 V Pi rail through the PCB V2 latch pulse on GPIO 7.
+- 12 V QDX/radio/ATU rail through the PCB V2 latch pulse on GPIO 38.
+- Active-low 5 V and 12 V rail feedback on GPIO 47 and GPIO 48.
 - Trap inputs.
 - Battery sensing.
 - GPS/RTC time.
