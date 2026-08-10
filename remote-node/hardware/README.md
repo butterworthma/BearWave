@@ -107,6 +107,10 @@ The remote-node electronics are mounted in a 3D-printed internal carrier designe
 
 The current enclosure design includes a Tracer 22 Ah battery, model `BP2548`, mounted as the 12 V battery within the case.
 
+![BearWave remote node enclosure internal carrier render](enclosure/images/remote_node_enclosure_render_iso.jpg)
+
+![BearWave remote node enclosure top panel render](enclosure/images/remote_node_enclosure_render_top.jpg)
+
 Printable files and reference renders are documented in:
 
 ```text

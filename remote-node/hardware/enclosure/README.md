@@ -4,6 +4,16 @@ This folder contains the 3D-printable enclosure and internal carrier parts for t
 
 The enclosure is intended to organise and protect the main electronics rather than replace the outer case. The Nanuk 905 provides the impact-resistant field housing, while these printed parts locate the electronics, battery, connectors, controls, and service labels so that the node can be assembled and inspected consistently.
 
+## Renders
+
+### Internal Carrier Layout
+
+![BearWave remote node enclosure internal carrier render](images/remote_node_enclosure_render_iso.jpg)
+
+### Top Panel Layout
+
+![BearWave remote node enclosure top panel render](images/remote_node_enclosure_render_top.jpg)
+
 ## Battery
 
 The current case design includes a Tracer 22 Ah battery, model `BP2548`. The battery is shown in the render as the green 12 V battery block and is retained by the printed battery cover and clip parts.
@@ -23,12 +33,7 @@ The printable files are stored in [`3mf/`](3mf/):
 | `LidCover3MF.3MF` | Internal lid cover part. |
 | `SMAnutspinner.3MF` | Printed tool for tightening SMA nuts during assembly. |
 
-Reference renders are stored in [`images/`](images/):
-
-| File | Description |
-|---|---|
-| `remote_node_enclosure_render_iso.jpg` | Isometric render showing the stacked hardware carrier, labelled top panel, and battery location. |
-| `remote_node_enclosure_render_top.jpg` | Top render showing the operator-facing layout and service labels. |
+The reference renders displayed above are stored in [`images/`](images/) so they can be used by this README and reused in the paper/source documentation.
 
 ## Assembly Notes
 
