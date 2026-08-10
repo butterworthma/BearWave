@@ -101,6 +101,23 @@ The main board features:
 - **Silkscreen**: White text and component labels
 - **Finish**: Professional HASL or ENIG finish
 
+## Enclosure and Printed Carrier
+
+The remote-node electronics are mounted in a 3D-printed internal carrier designed to fit inside a rugged Nanuk 905 protective case. The carrier provides a labelled top/front panel, hardware mounting features, battery retention, ATU/QDX retention features, and service access points for field assembly and inspection.
+
+The current enclosure design includes a Tracer 22 Ah battery, model `BP2548`, mounted as the 12 V battery within the case.
+
+Printable files and reference renders are documented in:
+
+```text
+enclosure/
+  README.md
+  3mf/
+  images/
+```
+
+See [enclosure/README.md](enclosure/README.md) for the part list, battery note, render images, and assembly notes.
+
 ## 🔧 Technical Features
 
 ### Communication Interfaces
