@@ -322,6 +322,23 @@ class RemoteNodeController:
         elif message.flags == EventFlag.TRAP_AND_LOW_BATTERY.value:
             esp.acknowledge_event("ALL")
 
+    def _message_should_send_sstv(self, message: BearWaveMessage) -> bool:
+        """
+        Return True only for acknowledged trap-alarm messages.
+
+        SSTV is intended as visual evidence for a trap event after the compact
+        JS8 alarm has already been delivered and acknowledged. It must not run
+        for routine heartbeats or low-battery-only messages, even though those
+        messages also use the same acknowledgement path.
+        """
+        return (
+            message.message_type == MessageType.TRAP_ALARM
+            and message.flags in {
+                EventFlag.TRAP.value,
+                EventFlag.TRAP_AND_LOW_BATTERY.value,
+            }
+        )
+
     def _generate_message_id(self) -> str:
         """
         Generate a compact 2-character base36-style message ID.
@@ -336,15 +353,22 @@ class RemoteNodeController:
         self,
         *,
         message: BearWaveMessage,
-        is_critical: bool,
     ):
         """
-        Run the optional SSTV evidence-image stage after critical ACK success.
+        Run the optional SSTV evidence-image stage after trap ACK success.
 
         The image stage is intentionally secondary. Failure here must not turn
         an already acknowledged trap alarm into an undelivered alarm.
         """
-        if not is_critical:
+        if not self._message_should_send_sstv(message):
+            self._log_utc_event(
+                "BW_SSTV_IMAGE_STAGE_SKIPPED",
+                node=message.node_id,
+                msg_id=message.message_id,
+                msg_type=message.message_type.value,
+                flags=message.flags,
+                reason="not_trap_alarm",
+            )
             return None
 
         result = self.sstv.transmit_alarm_image(
@@ -597,7 +621,6 @@ class RemoteNodeController:
                         self.store.clear()
                         sstv_result = self._run_post_ack_sstv_if_needed(
                             message=message,
-                            is_critical=True,
                         )
                         self._mark_event_delivered_to_esp(esp, message)
 
@@ -709,7 +732,6 @@ class RemoteNodeController:
                         )
                         sstv_result = self._run_post_ack_sstv_if_needed(
                             message=message,
-                            is_critical=is_critical,
                         )
                         self._mark_event_delivered_to_esp(esp, message)
 

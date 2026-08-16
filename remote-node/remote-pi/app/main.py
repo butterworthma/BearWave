@@ -135,7 +135,8 @@ BEARWAVE_LOG_LEVEL
         ERROR
 
 BEARWAVE_SSTV_ENABLED
-    Enable the optional post-ACK SSTV image stage for critical messages.
+    Enable the optional post-ACK SSTV image stage for trap alarm messages.
+    Heartbeat and low-battery-only messages do not trigger SSTV.
     Defaults to false.
 
 BEARWAVE_SSTV_DRY_RUN

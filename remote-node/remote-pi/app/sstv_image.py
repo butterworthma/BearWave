@@ -7,7 +7,7 @@ BearWave SSTV image helper
 This module provides the first thin SSTV extension for the remote node.
 
 It deliberately keeps the image path separate from the existing JS8/BW1 alarm
-path. The controller can call this only after a critical alarm has been
+path. The controller should call this only after a trap alarm has been
 acknowledged, so image transfer remains secondary evidence rather than the
 primary alarm mechanism.
 """
