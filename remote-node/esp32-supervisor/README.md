@@ -50,8 +50,9 @@ The previous prototype held GPIO 33 during ESP32 deep sleep because it directly 
 14. ESP32 replies `OK,SHUTDOWN_RECEIVED`.
 15. ESP32 waits 50 seconds to allow Linux shutdown.
 16. ESP32 turns off the 12 V rail, then the 5 V rail, using latch pulses and status feedback.
-17. ESP32 isolates the Pi UART pins, turns the OLED off, and enters deep sleep.
-18. ESP32 wakes by timer and repeats.
+17. ESP32 arms deep-sleep wake sources for the timer and both active-low trap inputs.
+18. ESP32 isolates the Pi UART pins, turns the OLED off, and enters deep sleep.
+19. ESP32 wakes by timer, or immediately if Trap 1 on GPIO5 or Trap 2 on GPIO4 pulls low, then repeats.
 
 ## UART command interface
 

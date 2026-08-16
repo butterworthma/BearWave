@@ -95,6 +95,7 @@
 #include "pins_arduino.h"
 #include "esp_sleep.h"
 #include "driver/gpio.h"
+#include "driver/rtc_io.h"
 
 // ============================================================
 // RTC DS3231 configuration
@@ -194,6 +195,10 @@ const uint64_t WAKE_INTERVAL_US = 5ULL * 60ULL * 1000000ULL;
 
 #define TRAP_PIN_1 5
 #define TRAP_PIN_2 4
+
+const uint64_t TRAP_WAKE_MASK =
+  (1ULL << TRAP_PIN_1) |
+  (1ULL << TRAP_PIN_2);
 
 // ============================================================
 // General timing configuration
@@ -970,6 +975,33 @@ bool anyTrapInputActive() {
   return trap1Active() || trap2Active();
 }
 
+void configureTrapInputPins() {
+  /*
+    Both trap inputs are wired active-low on PCB V2. The internal pull-ups keep
+    the inputs idle-high, and a closed trap switch pulls the corresponding GPIO
+    low. These are also the pins used by the EXT1 deep-sleep wake mask below.
+  */
+  pinMode(TRAP_PIN_1, INPUT_PULLUP);
+  pinMode(TRAP_PIN_2, INPUT_PULLUP);
+}
+
+void enableTrapDeepSleepWake() {
+  /*
+    While the ESP32-S3 is in deep sleep the normal digital GPIO block is off.
+    EXT1 wake is handled by the RTC controller and can monitor more than one
+    RTC-capable pin. ESP_EXT1_WAKEUP_ANY_LOW matches the active-low trap
+    wiring, so either Trap 1 on GPIO5 or Trap 2 on GPIO4 can wake the supervisor.
+  */
+  configureTrapInputPins();
+
+  rtc_gpio_pullup_en((gpio_num_t)TRAP_PIN_1);
+  rtc_gpio_pullup_en((gpio_num_t)TRAP_PIN_2);
+  rtc_gpio_pulldown_dis((gpio_num_t)TRAP_PIN_1);
+  rtc_gpio_pulldown_dis((gpio_num_t)TRAP_PIN_2);
+
+  esp_sleep_enable_ext1_wakeup(TRAP_WAKE_MASK, ESP_EXT1_WAKEUP_ANY_LOW);
+}
+
 String currentEventSummary() {
   bool trapOffer = trapLatched && !trapReported;
   bool lowBatOffer = lowBatteryActive && !lowBatteryReported;
@@ -1294,6 +1326,7 @@ void enterDeepSleepForNextCycle() {
   lastShutdownStage = 6;
   showStage("S6 latch idle", 1500);
 
+  enableTrapDeepSleepWake();
   esp_sleep_enable_timer_wakeup(WAKE_INTERVAL_US);
 
   showStage("Entering sleep", 2500);
@@ -1424,8 +1457,7 @@ void setup() {
 
   analogReadResolution(12);
 
-  pinMode(TRAP_PIN_1, INPUT_PULLUP);
-  pinMode(TRAP_PIN_2, INPUT_PULLUP);
+  configureTrapInputPins();
 
   /*
     Start DS3231 RTC bus.
