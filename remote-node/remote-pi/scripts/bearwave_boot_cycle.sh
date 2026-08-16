@@ -38,7 +38,10 @@ QDX_CAT_PORT="${BEARWAVE_QDX_CAT_PORT:-/dev/ttyACM0}"
 JS8_HOST="127.0.0.1"
 JS8_PORT="2442"
 JS8_DIAL_HZ="7078000"
-JS8_START_DELAY_S="15"
+# JS8Call starts noticeably more slowly on the Raspberry Pi Zero 2 W than on
+# the Pi 4 development node. Give the GUI and TCP API enough time to initialise
+# before js8_prepare.py begins probing 127.0.0.1:2442.
+JS8_START_DELAY_S="45"
 
 SSTV_ENABLED="${BEARWAVE_SSTV_ENABLED:-1}"
 SSTV_DRY_RUN="${BEARWAVE_SSTV_DRY_RUN:-0}"
