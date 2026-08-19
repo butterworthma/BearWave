@@ -9,9 +9,15 @@
 <body>
   <div class="screen-shell">
     <header class="topbar">
-      <button class="icon-button menu-button" type="button" aria-label="Menu">
+      <button id="menuButton" class="icon-button menu-button" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
+
+      <div id="windowMenu" class="window-menu hidden" role="menu" aria-label="Window controls">
+        <button data-window-action="minimize" type="button" role="menuitem">Minimise</button>
+        <button data-window-action="maximize" type="button" role="menuitem">Maximise</button>
+        <button data-window-action="close" type="button" role="menuitem">Close</button>
+      </div>
 
       <img class="brand-logo" src="/assets/bearwave-logo-header.png" alt="BearWave">
 
@@ -25,7 +31,7 @@
         <strong id="utcClock">--:--:--</strong>
       </div>
 
-      <button class="icon-button settings-button" type="button" aria-label="Settings">
+      <button id="timeSyncBtn" class="icon-button settings-button" type="button" aria-label="Resynchronise time from GPS" title="Resynchronise time from GPS">
         <span></span>
       </button>
     </header>

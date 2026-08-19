@@ -20,6 +20,9 @@ const imageDialogImg = document.getElementById("imageDialogImg");
 const imageDialogCaption = document.getElementById("imageDialogCaption");
 const closeImageBtn = document.getElementById("closeImageBtn");
 const navButtons = document.querySelectorAll(".bottom-nav button[data-view]");
+const menuButton = document.getElementById("menuButton");
+const windowMenu = document.getElementById("windowMenu");
+const timeSyncBtn = document.getElementById("timeSyncBtn");
 
 /*
  * The dashboard is deliberately a small browser application with no build
@@ -498,13 +501,36 @@ function bindImageThumbs() {
 function bindCardButtons() {
   document.querySelectorAll("button[data-action='ack']").forEach((btn) => {
     btn.onclick = async () => {
-      await fetch(`/api/nodes/${encodeURIComponent(btn.dataset.node)}/ack-alarm`, { method: "POST" });
+      const res = await fetch(`/api/nodes/${encodeURIComponent(btn.dataset.node)}/ack-alarm`, { method: "POST" });
+      if (!res.ok) return;
+      const updatedNode = await res.json();
+      const idx = nodes.findIndex((node) => node.nodeId === updatedNode.nodeId);
+      if (idx >= 0) {
+        nodes[idx] = updatedNode;
+        addHistoryEvent({
+          ts: new Date().toISOString(),
+          event: "operator_ack",
+          node: updatedNode.nodeId,
+          text: `${updatedNode.nodeId} acknowledged on dashboard`
+        });
+        render();
+      }
     };
   });
 
   document.querySelectorAll("button[data-action='clear']").forEach((btn) => {
     btn.onclick = async () => {
-      await fetch(`/api/nodes/${encodeURIComponent(btn.dataset.node)}/clear-alarm`, { method: "POST" });
+      const nodeId = btn.dataset.node;
+      const res = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/clear-alarm`, { method: "POST" });
+      if (!res.ok) return;
+      nodes = nodes.filter((node) => node.nodeId !== nodeId);
+      addHistoryEvent({
+        ts: new Date().toISOString(),
+        event: "operator_clear",
+        node: nodeId,
+        text: `${nodeId} removed from dashboard`
+      });
+      render();
     };
   });
 }
@@ -547,6 +573,9 @@ function attachImageFallback() {
 
 function getNodeState(node) {
   if (node.alarmActive) {
+    if (node.alarmAcknowledged) {
+      return { key: "red", label: "ACKNOWLEDGED", detail: "Trap alarm acknowledged", symbol: "!" };
+    }
     return { key: "red", label: "ALARM", detail: "Trap triggered", symbol: "!" };
   }
   if (node.health === "green") {
@@ -678,6 +707,77 @@ closeImageBtn.addEventListener("click", () => {
 imageDialog.addEventListener("click", (event) => {
   if (event.target === imageDialog) {
     imageDialog.close();
+  }
+});
+
+menuButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const isOpen = !windowMenu.classList.contains("hidden");
+  windowMenu.classList.toggle("hidden", isOpen);
+  menuButton.setAttribute("aria-expanded", String(!isOpen));
+});
+
+windowMenu.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-window-action]");
+  if (!button) return;
+
+  const action = button.dataset.windowAction;
+  windowMenu.classList.add("hidden");
+  menuButton.setAttribute("aria-expanded", "false");
+
+  if (action === "maximize" && document.documentElement.requestFullscreen) {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch (_err) {
+      /* The backend window-manager action below is the fallback. */
+    }
+  }
+
+  try {
+    const res = await fetch(`/api/window/${encodeURIComponent(action)}`, { method: "POST" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      addHistoryEvent({
+        ts: new Date().toISOString(),
+        event: "window_action_failed",
+        text: body.error || `${action} failed`
+      });
+    }
+  } catch (err) {
+    addHistoryEvent({
+      ts: new Date().toISOString(),
+      event: "window_action_failed",
+      text: err.message || `${action} failed`
+    });
+  }
+});
+
+document.addEventListener("click", () => {
+  windowMenu.classList.add("hidden");
+  menuButton.setAttribute("aria-expanded", "false");
+});
+
+timeSyncBtn.addEventListener("click", async () => {
+  timeSyncBtn.classList.add("working");
+  try {
+    const res = await fetch("/api/time/resync", { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    addHistoryEvent({
+      ts: new Date().toISOString(),
+      event: res.ok ? "gps_time_sync" : "gps_time_sync_failed",
+      text: res.ok
+        ? `Control node time resynchronised from GPS: ${body.gpsTime}`
+        : (body.error || "GPS time resync failed")
+    });
+  } catch (err) {
+    addHistoryEvent({
+      ts: new Date().toISOString(),
+      event: "gps_time_sync_failed",
+      text: err.message || "GPS time resync failed"
+    });
+  } finally {
+    timeSyncBtn.classList.remove("working");
+    if (activeView === "history") renderHistory();
   }
 });
 

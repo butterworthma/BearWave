@@ -7,7 +7,7 @@ This repository contains the ESP32/Heltec supervisor firmware for the BearWave r
 File:
 
 ```text
-BearWave_ESP32_Remote_Node_Supervisor.ino
+BearWave_ESP32_Remote_Node_Supervisor/BearWave_ESP32_Remote_Node_Supervisor.ino
 ```
 
 This version targets BearWave PCB V2, where the 5 V Raspberry Pi rail and 12 V radio/ATU rail are controlled separately through external flip-flop latch circuits.
@@ -21,7 +21,7 @@ BearWave PCB V2 separates the high-power rails:
 
 Each rail has:
 
-- a pulse input driven briefly by the ESP32
+- a pulse input driven briefly HIGH by the ESP32
 - a rail-present status input read by the ESP32
 
 On the current PCB V2 bench unit, the latch inputs respond to a short driven-HIGH pulse on the Heltec GPIO pins. The firmware keeps the pulse outputs LOW when idle, drives them HIGH for the configured pulse width, then returns them LOW. Both `5VOK` and `12VOK` are active-low rail-present inputs, so the firmware enables ESP32 internal pull-ups: rail OFF reads HIGH and rail ON reads LOW.

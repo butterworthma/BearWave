@@ -37,7 +37,7 @@ Start from Raspberry Pi OS with a graphical desktop.
 
 ```bash
 sudo apt update
-sudo apt install -y git curl nodejs npm chromium-browser x11-utils pulseaudio-utils ffmpeg python3 python3-venv qsstv js8call
+sudo apt install -y git curl nodejs npm chromium-browser x11-utils pulseaudio-utils ffmpeg python3 python3-venv qsstv js8call wmctrl xdotool gpsd-clients dnsmasq-base
 ```
 
 Install SparkSDR using the package or installer appropriate for the control-node Pi. Confirm it can connect to the Hermes-Lite before configuring BearWave.
@@ -122,6 +122,69 @@ BEARWAVE_JS8CALL_CAPTURE_VOLUME=60%
 ```
 
 These values reduce overloading and improve reliable JS8Call decode while keeping SSTV decode usable.
+
+## Dashboard Controls
+
+The 7 inch dashboard is intended to be the permanent operator screen. It is not
+just a passive web page:
+
+- The top-left menu opens window controls for minimise, maximise, and close.
+  These controls call the local backend, which uses `wmctrl` and `xdotool`
+  against the Chromium kiosk window.
+- The circular button beside the UTC clock requests a GPS time resync. The
+  backend reads GPS time with `gpspipe`; if no GPS is attached or no valid UTC
+  fix is available, the dashboard reports that cleanly instead of changing the
+  clock.
+- Each node image strip has `Ack` and `Clear` controls. `Ack` marks the current
+  alarm state as acknowledged in the dashboard state. `Clear` removes that node
+  card from the local display state, which is useful after bench tests or after
+  a trap visit.
+- The bottom tabs switch between Dashboard, Nodes, Alerts, History, Map, and
+  Logs. Map is currently reserved for later work; Logs shows the control-node
+  application log so a monitor connected to the Pi can show what the system is
+  doing without an SSH session.
+
+If GPS time setting is required from the dashboard, allow the dashboard user to
+run `date` without a password:
+
+```bash
+echo 'mark ALL=(root) NOPASSWD: /usr/bin/date' | sudo tee /etc/sudoers.d/bearwave-gps-time
+sudo chmod 440 /etc/sudoers.d/bearwave-gps-time
+```
+
+## Standalone Hermes-Lite Ethernet Link
+
+For field deployment, the control-node Pi can keep WLAN available for
+maintenance while providing a private DHCP network on its Ethernet port for the
+directly connected Hermes-Lite SDR.
+
+The tested private Ethernet plan is:
+
+```text
+Pi wlan0: site/admin network, DHCP from normal router
+Pi eth0:  192.168.50.1/24 static
+Hermes-Lite: 192.168.50.85 from Pi DHCP
+Hermes-Lite MAC: 00:1c:c0:a2:13:dd
+```
+
+The DHCP configuration is stored in
+`config/dnsmasq-hermes-eth0.conf`, and the systemd unit is
+`systemd/bearwave-hermes-dhcp.service`.
+
+Install on the control node with:
+
+```bash
+sudo apt-get install -y dnsmasq-base
+sudo nmcli connection add type ethernet ifname eth0 con-name bearwave-hermes-eth0 ipv4.method manual ipv4.addresses 192.168.50.1/24 ipv4.never-default yes ipv6.method disabled
+sudo cp /home/mark/control-node/systemd/bearwave-hermes-dhcp.service /etc/systemd/system/bearwave-hermes-dhcp.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now bearwave-hermes-dhcp.service
+```
+
+SparkSDR's `Last_Session` profile stores the Hermes-Lite by device identity
+rather than by the previous WLAN IP address. Once the Hermes-Lite is moved to
+the direct Ethernet link and receives `192.168.50.85`, SparkSDR should load the
+same Last Session profile against the same radio hardware.
 
 ## QSSTV Configuration
 
@@ -238,6 +301,10 @@ Make scripts executable:
 ```bash
 chmod +x /home/mark/control-node/scripts/*.sh
 ```
+
+The desktop launcher starts Chromium with `--password-store=basic`. This avoids
+the graphical keyring unlock prompt that otherwise appears before the dashboard
+opens on boot.
 
 Reboot and confirm the dashboard appears automatically:
 

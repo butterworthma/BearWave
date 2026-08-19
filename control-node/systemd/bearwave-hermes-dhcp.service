@@ -1,0 +1,13 @@
+[Unit]
+Description=BearWave private DHCP service for Hermes-Lite on eth0
+Wants=network-online.target
+After=NetworkManager.service network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/dnsmasq --no-daemon --conf-file=/home/mark/control-node/config/dnsmasq-hermes-eth0.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

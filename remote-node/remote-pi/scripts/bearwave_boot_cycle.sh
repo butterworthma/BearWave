@@ -46,10 +46,11 @@ JS8_START_DELAY_S="45"
 SSTV_ENABLED="${BEARWAVE_SSTV_ENABLED:-1}"
 SSTV_DRY_RUN="${BEARWAVE_SSTV_DRY_RUN:-0}"
 SSTV_REPEAT_COUNT="${BEARWAVE_SSTV_REPEAT_COUNT:-1}"
-SSTV_MODE="${BEARWAVE_SSTV_MODE:-Robot36}"
+SSTV_MODE="${BEARWAVE_SSTV_MODE:-ScottieS1}"
 SSTV_WORK_DIR="${BEARWAVE_SSTV_WORK_DIR:-/home/mark/bearwave/sstv}"
 SSTV_PILLOW_PYTHON="${BEARWAVE_SSTV_PILLOW_PYTHON:-/usr/bin/python3}"
 DIAGNOSTIC_WINDOW_ENABLED="${BEARWAVE_DIAGNOSTIC_WINDOW_ENABLED:-1}"
+JS8_HEADLESS_DISPLAY="${BEARWAVE_JS8_HEADLESS_DISPLAY:-:99}"
 
 # The SSTV commands are template strings consumed by app/sstv_image.py. The
 # placeholders {image}, {prepared}, {wav}, and {mode} are filled in for each
@@ -87,10 +88,70 @@ mkdir -p "${LOG_DIR}"
 
 exec >> "${LOG_FILE}" 2>&1
 
+display_is_ready() {
+  local display_name="${1:-:0}"
+
+  if command -v xdpyinfo >/dev/null 2>&1; then
+    DISPLAY="${display_name}" xdpyinfo >/dev/null 2>&1
+    return $?
+  fi
+
+  [ -S "/tmp/.X11-unix/X${display_name#:}" ]
+}
+
+start_headless_display() {
+  if display_is_ready "${JS8_HEADLESS_DISPLAY}"; then
+    echo "[BOOT] Headless JS8 display already available on ${JS8_HEADLESS_DISPLAY}"
+    return 0
+  fi
+
+  if ! command -v Xvfb >/dev/null 2>&1; then
+    echo "[BOOT] ERROR: No physical display found and Xvfb is not installed"
+    echo "[BOOT] Install with: sudo apt install -y xvfb"
+    return 1
+  fi
+
+  echo "[BOOT] Starting headless Xvfb display on ${JS8_HEADLESS_DISPLAY}"
+  runuser -u "${PI_USER}" -- env \
+    XDG_RUNTIME_DIR="/run/user/${PI_UID}" \
+    Xvfb "${JS8_HEADLESS_DISPLAY}" -screen 0 1024x768x24 -nolisten tcp &
+
+  for i in $(seq 1 15); do
+    if display_is_ready "${JS8_HEADLESS_DISPLAY}"; then
+      echo "[BOOT] Headless JS8 display ready on ${JS8_HEADLESS_DISPLAY}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[BOOT] ERROR: Headless JS8 display did not become ready"
+  return 1
+}
+
+prepare_js8_display() {
+  if display_is_ready ":0"; then
+    JS8_DISPLAY=":0"
+    JS8_XAUTHORITY="/home/${PI_USER}/.Xauthority"
+    JS8_LAUNCH_MODE="desktop"
+    echo "[BOOT] Physical display found; JS8Call will use DISPLAY=${JS8_DISPLAY}"
+    return 0
+  fi
+
+  echo "[BOOT] No physical DISPLAY=:0 found; using headless JS8Call display"
+  if ! start_headless_display; then
+    return 1
+  fi
+
+  JS8_DISPLAY="${JS8_HEADLESS_DISPLAY}"
+  JS8_XAUTHORITY=""
+  JS8_LAUNCH_MODE="headless"
+  return 0
+}
+
 if [ "${DIAGNOSTIC_WINDOW_ENABLED}" = "1" ]; then
   if pgrep -u "${PI_USER}" -f "tail -n +1 -F ${LOG_FILE}" >/dev/null 2>&1; then
     echo "[BOOT] Diagnostic log window already running"
-  elif command -v lxterminal >/dev/null 2>&1; then
+  elif display_is_ready ":0" && command -v lxterminal >/dev/null 2>&1; then
     echo "[BOOT] Launching diagnostic log window"
     runuser -u "${PI_USER}" -- env \
       DISPLAY=:0 \
@@ -100,6 +161,8 @@ if [ "${DIAGNOSTIC_WINDOW_ENABLED}" = "1" ]; then
         --title="BearWave Diagnostics" \
         --geometry=120x34 \
         -e bash -lc "echo 'BearWave diagnostics - tailing ${LOG_FILE}'; echo; tail -n +1 -F '${LOG_FILE}'" &
+  elif ! display_is_ready ":0"; then
+    echo "[BOOT] Diagnostic log window skipped because no physical display is available"
   else
     echo "[BOOT] Diagnostic log window requested but lxterminal was not found"
   fi
@@ -130,6 +193,7 @@ echo "[BOOT] SSTV mode: ${SSTV_MODE}"
 echo "[BOOT] SSTV repeat count: ${SSTV_REPEAT_COUNT}"
 echo "[BOOT] SSTV transmit command: ${SSTV_TRANSMIT_COMMAND}"
 echo "[BOOT] Diagnostic window enabled: ${DIAGNOSTIC_WINDOW_ENABLED}"
+echo "[BOOT] Headless JS8 display: ${JS8_HEADLESS_DISPLAY}"
 
 # -------------------------------------------------------------------
 # Step 1: wait for ESP32 UART
@@ -231,7 +295,16 @@ fi
 
 echo "[BOOT] Launching JS8Call from desktop launcher"
 
-if [ ! -f "${JS8_DESKTOP_FILE}" ]; then
+if ! prepare_js8_display; then
+  "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
+    --port "${ESP32_PORT}" \
+    --baud "${ESP32_BAUD}" || true
+
+  shutdown -h now
+  exit 1
+fi
+
+if [ "${JS8_LAUNCH_MODE}" = "desktop" ] && [ ! -f "${JS8_DESKTOP_FILE}" ]; then
   echo "[BOOT] ERROR: JS8Call desktop file not found: ${JS8_DESKTOP_FILE}"
 
   "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
@@ -243,30 +316,52 @@ if [ ! -f "${JS8_DESKTOP_FILE}" ]; then
 fi
 
 if ! pgrep -u "${PI_USER}" -x js8call >/dev/null 2>&1; then
-  echo "[BOOT] JS8Call is not running; launching via gio"
-
-  runuser -u "${PI_USER}" -- env \
-    DISPLAY=:0 \
-    XAUTHORITY="/home/${PI_USER}/.Xauthority" \
-    XDG_RUNTIME_DIR="/run/user/${PI_UID}" \
-    gio launch "${JS8_DESKTOP_FILE}" &
-
-  JS8_LAUNCH_RC=$?
-
-  if [ "${JS8_LAUNCH_RC}" -ne 0 ]; then
-    echo "[BOOT] WARNING: gio launch returned ${JS8_LAUNCH_RC}"
-    echo "[BOOT] Trying gtk-launch fallback"
+  if [ "${JS8_LAUNCH_MODE}" = "desktop" ]; then
+    echo "[BOOT] JS8Call is not running; launching via desktop profile on ${JS8_DISPLAY}"
 
     runuser -u "${PI_USER}" -- env \
-      DISPLAY=:0 \
-      XAUTHORITY="/home/${PI_USER}/.Xauthority" \
+      DISPLAY="${JS8_DISPLAY}" \
+      XAUTHORITY="${JS8_XAUTHORITY}" \
       XDG_RUNTIME_DIR="/run/user/${PI_UID}" \
-      gtk-launch js8call &
+      gio launch "${JS8_DESKTOP_FILE}" &
 
-    GTK_LAUNCH_RC=$?
+    JS8_LAUNCH_RC=$?
 
-    if [ "${GTK_LAUNCH_RC}" -ne 0 ]; then
-      echo "[BOOT] ERROR: gtk-launch also failed with ${GTK_LAUNCH_RC}"
+    if [ "${JS8_LAUNCH_RC}" -ne 0 ]; then
+      echo "[BOOT] WARNING: gio launch returned ${JS8_LAUNCH_RC}"
+      echo "[BOOT] Trying gtk-launch fallback"
+
+      runuser -u "${PI_USER}" -- env \
+        DISPLAY="${JS8_DISPLAY}" \
+        XAUTHORITY="${JS8_XAUTHORITY}" \
+        XDG_RUNTIME_DIR="/run/user/${PI_UID}" \
+        gtk-launch js8call &
+
+      GTK_LAUNCH_RC=$?
+
+      if [ "${GTK_LAUNCH_RC}" -ne 0 ]; then
+        echo "[BOOT] ERROR: gtk-launch also failed with ${GTK_LAUNCH_RC}"
+
+        "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
+          --port "${ESP32_PORT}" \
+          --baud "${ESP32_BAUD}" || true
+
+        shutdown -h now
+        exit 1
+      fi
+    fi
+  else
+    echo "[BOOT] JS8Call is not running; launching directly on headless ${JS8_DISPLAY}"
+
+    runuser -u "${PI_USER}" -- env \
+      DISPLAY="${JS8_DISPLAY}" \
+      XDG_RUNTIME_DIR="/run/user/${PI_UID}" \
+      /usr/bin/js8call &
+
+    JS8_LAUNCH_RC=$?
+
+    if [ "${JS8_LAUNCH_RC}" -ne 0 ]; then
+      echo "[BOOT] ERROR: headless JS8Call launch failed with ${JS8_LAUNCH_RC}"
 
       "${VENV_PYTHON}" "${BEARWAVE_DIR}/scripts/esp32_shutdown_request.py" \
         --port "${ESP32_PORT}" \

@@ -118,6 +118,7 @@ launch_kiosk() {
   log "starting dashboard kiosk: $DASHBOARD_URL"
   nohup "$chromium" \
     --kiosk \
+    --password-store=basic \
     --noerrdialogs \
     --disable-infobars \
     --disable-session-crashed-bubble \
@@ -128,7 +129,7 @@ launch_kiosk() {
 
 log "BearWave desktop startup begin"
 wait_for_display
-start_once "SparkSDR" 'SparkSDR' /usr/local/bin/SparkSDR
+start_once "SparkSDR" 'SparkSDR' /usr/local/bin/SparkSDR Last_Session
 sleep 8
 start_once "JS8Call" 'js8call' /usr/bin/js8call
 sleep 6

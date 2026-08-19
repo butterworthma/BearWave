@@ -100,6 +100,7 @@ export class NodeStore {
     const node = this.nodes.get(nodeId);
     if (!node) return null;
     node.alarmAcknowledged = true;
+    node.lastUpdatedAt = Date.now();
     return node;
   }
 
@@ -108,7 +109,15 @@ export class NodeStore {
     if (!node) return null;
     node.alarmActive = false;
     node.alarmAcknowledged = false;
+    node.sstvImageStatus = "idle";
+    node.sstvImageExpectedAt = null;
+    node.sstvImageWindowUntil = null;
+    node.lastUpdatedAt = Date.now();
     return node;
+  }
+
+  removeNode(nodeId) {
+    return this.nodes.delete(nodeId);
   }
 
   clearLowBattery(nodeId) {

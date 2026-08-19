@@ -16,7 +16,8 @@ remote-pi/
   requirements.txt     Python packages for the Pi virtual environment
 
 esp32-supervisor/
-  BearWave_ESP32_Remote_Node_Supervisor.ino
+  BearWave_ESP32_Remote_Node_Supervisor/
+    BearWave_ESP32_Remote_Node_Supervisor.ino
   README.md
 
 docs/
@@ -43,7 +44,7 @@ Main service target:
 graphical.target
 ```
 
-The service runs as root because it sets system time, launches GUI JS8Call into the `mark` desktop session, communicates with `/dev/serial0`, and halts the Pi at the end of the wake cycle.
+The service runs as root because it sets system time, launches JS8Call for the `mark` user, communicates with `/dev/serial0`, and halts the Pi at the end of the wake cycle. If a monitor is connected, JS8Call uses the real desktop display; when the field node is headless, the boot script starts a small Xvfb virtual display so JS8Call can still run unattended.
 
 ## Wake Cycle Summary
 
@@ -55,7 +56,7 @@ The service runs as root because it sets system time, launches GUI JS8Call into 
 6. The boot script waits for the ESP32 UART at `/dev/serial0`.
 7. The boot script waits for the QDX CAT/audio device at `/dev/ttyACM0` before launching JS8Call.
 8. The Pi asks the ESP32 for UTC time with `TIME?`.
-9. The Pi starts JS8Call from the desktop launcher.
+9. The Pi starts JS8Call on the physical display, or under Xvfb when headless.
 10. The Pi waits for the JS8Call TCP API on `127.0.0.1:2442`, then sets JS8Call to 7.078 MHz.
 11. The Python app in `remote-pi/app/` sends heartbeat, trap alarm, low-battery, or pending critical messages.
 12. The Pi waits for the control-node ACK.
@@ -78,7 +79,7 @@ Current live defaults from the Pi:
 BEARWAVE_SSTV_ENABLED=1
 BEARWAVE_SSTV_DRY_RUN=0
 BEARWAVE_SSTV_REPEAT_COUNT=1
-BEARWAVE_SSTV_MODE=Robot36
+BEARWAVE_SSTV_MODE=ScottieS1
 BEARWAVE_SSTV_TX_GAIN=1.0
 BEARWAVE_SSTV_WORK_DIR=/home/mark/bearwave/sstv
 ```
@@ -111,7 +112,7 @@ Install system packages:
 
 ```bash
 sudo apt update
-sudo apt install -y git python3 python3-venv python3-pip js8call rpicam-apps ffmpeg alsa-utils libhamlib-utils lxterminal
+sudo apt install -y git python3 python3-venv python3-pip js8call rpicam-apps ffmpeg alsa-utils libhamlib-utils lxterminal xvfb
 ```
 
 Clone the repository:
@@ -174,7 +175,7 @@ Before unattended testing, start JS8Call manually once and confirm:
 - CAT/PTT works from JS8Call.
 - The saved desktop profile starts correctly from `/usr/share/applications/js8call.desktop`.
 
-The boot script launches JS8Call using the desktop launcher rather than directly invoking `js8call`, because the desktop path reproduced the saved audio/radio profile reliably on the live Pi.
+The boot script launches JS8Call using the desktop launcher when a physical display is available, because that path reproduced the saved audio/radio profile reliably during bench testing. If no monitor is connected, it starts `Xvfb` on display `:99` and launches `/usr/bin/js8call` directly in that virtual display. This keeps the Pi Zero 2 W remote node usable as a fully headless field unit.
 
 ## QDX SSTV Transmit Setup
 
@@ -204,10 +205,10 @@ BEARWAVE_SSTV_TX_GAIN=1.0
 
 ## ESP32 Supervisor
 
-The ESP32 firmware is in:
+The ESP32 firmware is stored as a normal Arduino sketch folder:
 
 ```text
-esp32-supervisor/BearWave_ESP32_Remote_Node_Supervisor.ino
+esp32-supervisor/BearWave_ESP32_Remote_Node_Supervisor/BearWave_ESP32_Remote_Node_Supervisor.ino
 ```
 
 It controls:
@@ -253,6 +254,7 @@ command -v aplay
 command -v ffmpeg
 command -v rigctl
 command -v js8call
+command -v Xvfb
 ```
 
 Live check on 2026-07-26 found:

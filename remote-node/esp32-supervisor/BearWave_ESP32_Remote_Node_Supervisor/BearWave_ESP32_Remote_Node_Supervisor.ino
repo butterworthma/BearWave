@@ -152,7 +152,8 @@
 
 /*
   V2 power latch convention:
-    ENABLE5VPULSE / ENABLE12VPULSE are active-low momentary pulse inputs.
+    ENABLE5VPULSE / ENABLE12VPULSE are momentary latch inputs that were
+    bench-proven to toggle from a driven HIGH pulse.
     5VOK / 12VOK are rail-present status inputs. The current PCB V2 bench unit
     presents both 5VOK and 12VOK as active-low open-drain/open-collector style
     signals. The ESP32 enables internal pull-ups so OFF reads HIGH and ON reads

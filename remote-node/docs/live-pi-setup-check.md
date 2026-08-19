@@ -83,7 +83,7 @@ The live `bearwave_boot_cycle.sh` uses:
 SSTV_ENABLED="${BEARWAVE_SSTV_ENABLED:-1}"
 SSTV_DRY_RUN="${BEARWAVE_SSTV_DRY_RUN:-0}"
 SSTV_REPEAT_COUNT="${BEARWAVE_SSTV_REPEAT_COUNT:-1}"
-SSTV_MODE="${BEARWAVE_SSTV_MODE:-Robot36}"
+SSTV_MODE="${BEARWAVE_SSTV_MODE:-ScottieS1}"
 SSTV_WORK_DIR="${BEARWAVE_SSTV_WORK_DIR:-/home/mark/bearwave/sstv}"
 SSTV_PILLOW_PYTHON="${BEARWAVE_SSTV_PILLOW_PYTHON:-/usr/bin/python3}"
 ```
@@ -113,7 +113,7 @@ The old setup material described a generic headless JS8Call/noVNC Pi. The live B
 - It uses `/home/mark/bearwave`, not a generic `pi` user layout.
 - It uses ESP32-supervised power and `/dev/serial0`.
 - It uses a system-wide `bearwave-cycle.service`.
-- It launches JS8Call through the desktop `.desktop` launcher.
+- It launches JS8Call through the desktop `.desktop` launcher when a real display is present, or directly under Xvfb on display `:99` when the node is headless.
 - It includes SSTV capture/encode/transmit after acknowledged alarms.
 - It uses Pillow/PySSTV rather than ImageMagick `convert`.
 - It uses QDX PTT through `rigctl` and WAV playback through `aplay`.
